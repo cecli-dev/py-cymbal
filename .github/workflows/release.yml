@@ -29,8 +29,9 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install build setuptools wheel twine gopy pybindgen
-
+        pip install build setuptools wheel twine pybindgen
+        go install github.com/go-python/gopy@latest
+        echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
     - name: Build Python bindings
       run: |
         # Ensure CGO flags are set for SQLite FTS5
