@@ -6,9 +6,8 @@ set -e  # Exit on error
 echo "Building py-cymbal Python bindings..."
 
 # Set up environment
-export PATH=/home/dwash/go/bin:$PATH
+export PATH=$HOME/go/bin:$HOME/.local/bin:$(go env GOPATH)/bin:$PATH
 export CGO_CFLAGS="-DSQLITE_ENABLE_FTS5 $(python3 -c 'import sysconfig; print("-I" + sysconfig.get_path("include"))')"
-
 # Clean previous builds
 echo "Cleaning previous builds..."
 rm -rf python/cymbal/_pycymbal*.so python/cymbal/*.pyc __pycache__ build dist *.egg-info
