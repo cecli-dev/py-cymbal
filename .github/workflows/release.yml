@@ -31,6 +31,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install build setuptools wheel twine pybindgen
         go install github.com/go-python/gopy@v0.4.8
+        go install golang.org/x/tools/cmd/goimports@latest
         echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
     - name: Build Python bindings
       run: |
