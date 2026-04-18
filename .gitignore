@@ -1,0 +1,43 @@
+# Ignore everything
+*
+
+# But descend into directories
+!*/
+
+# Recursively allow files under subtree
+!/.github/**
+!/go/**
+!/python/**
+!/examples/**
+
+# Specific Files
+!/.gitignore
+!/LICENSE
+!/MANIFEST.in
+!/README.md
+!/pyproject.toml
+!/setup.py
+!/build.sh
+!/build_fixed.sh
+!/test_build.py
+!/test_import.py
+!/test_import.sh
+
+# Ignore specific files
+.cecli*
+*.pyc
+__pycache__/
+build/
+dist/
+*.egg-info
+*.so
+go/py-cymbal
+go/Makefile
+go/build.py
+go/pycymbal.c
+go/pycymbal.go
+go/pycymbal_go.h
+go/__init__.py
+python/cymbal/*.so
+python/cymbal/*.c
+python/cymbal/pycymbal_go.h

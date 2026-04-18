@@ -1,0 +1,53 @@
+[build-system]
+requires = [
+    "setuptools>=42",
+    "wheel",
+    "pybindgen>=0.22.1",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "py-cymbal"
+version = "0.1.1"
+description = "Python bindings for Cymbal code indexing and symbol discovery"
+readme = "README.md"
+requires-python = ">=3.7"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    {name = "Cymbal Contributors", email = "contact@example.com"},
+]
+keywords = ["code", "indexing", "symbol", "search", "analysis", "cymbal"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Version Control :: Git",
+    "Topic :: Text Processing :: Linguistic",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: Microsoft :: Windows",
+]
+
+[project.urls]
+Homepage = "https://github.com/dwash/py-cymbal"
+Bug-Tracker = "https://github.com/dwash/py-cymbal/issues"
+Source = "https://github.com/dwash/py-cymbal"
+
+[tool.setuptools]
+package-dir = {"" = "python"}
+include-package-data = true
+zip-safe = false
+
+[tool.setuptools.packages.find]
+where = ["python"]
+
+[tool.setuptools.package-data]
+cymbal = ["*.so", "*.py"]
