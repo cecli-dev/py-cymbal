@@ -31,6 +31,40 @@ class Cymbal:
         if repo_path:
             self.index(repo_path)
     
+    def _symbol_to_dict(self, symbol):
+        """Convert a SymbolResult to a dictionary."""
+        if not symbol:
+            return None
+        return {
+            "name": symbol.Name,
+            "kind": symbol.Kind,
+            "file": symbol.File,
+            "start_line": symbol.StartLine,
+            "end_line": symbol.EndLine,
+            "language": symbol.Language
+        }
+
+    def _ref_to_dict(self, ref):
+        """Convert a RefResult to a dictionary."""
+        if not ref:
+            return None
+        return {
+            "file": ref.File,
+            "line": ref.Line,
+            "rel_path": ref.RelPath,
+            "name": ref.Name
+        }
+
+    def _impact_to_dict(self, impact):
+        """Convert an ImpactResult to a dictionary."""
+        if not impact:
+            return None
+        return {
+            "symbol": self._symbol_to_dict(impact.Symbol),
+            "reason": impact.Reason,
+            "severity": impact.Severity
+        }
+
     def index(self, repo_path):
         """
         Index a repository.
@@ -44,7 +78,7 @@ class Cymbal:
         Raises:
             Exception: If indexing fails.
         """
-        return self._cymbal.Index(repo_path)
+        return str(self._cymbal.Index(repo_path))
     
     def search(self, query, limit=20):
         """
@@ -55,12 +89,13 @@ class Cymbal:
             limit (int): Maximum number of results to return.
             
         Returns:
-            list: List of symbol results (as Go objects).
+            list: List of symbol results (as dictionaries).
             
         Raises:
             Exception: If search fails or no database is available.
         """
-        return self._cymbal.Search(query, limit)
+        results = self._cymbal.Search(query, limit)
+        return [self._symbol_to_dict(s) for s in results]
     
     def investigate(self, symbol_name):
         """
@@ -70,12 +105,24 @@ class Cymbal:
             symbol_name (str): Name of symbol to investigate.
             
         Returns:
-            object: Investigation result with definition and references.
+            dict: Investigation result with definition and references.
             
         Raises:
             Exception: If investigation fails or no database is available.
         """
-        return self._cymbal.Investigate(symbol_name)
+        res = self._cymbal.Investigate(symbol_name)
+        if not res:
+            return None
+            
+        return {
+            "symbol": self._symbol_to_dict(res.Symbol),
+            "source": res.Source,
+            "kind": res.Kind,
+            "refs": [self._ref_to_dict(r) for r in res.Refs],
+            "impact": [self._impact_to_dict(i) for i in res.Impact],
+            "members": [self._symbol_to_dict(m) for m in res.Members],
+            "outline": [self._symbol_to_dict(o) for o in res.Outline]
+        }
     
     def find_references(self, symbol_name, limit=50):
         """
@@ -86,17 +133,18 @@ class Cymbal:
             limit (int): Maximum number of references to return.
             
         Returns:
-            list: List of reference results.
+            list: List of reference results (as dictionaries).
             
         Raises:
             Exception: If reference finding fails or no database is available.
         """
-        return self._cymbal.FindReferences(symbol_name, limit)
+        refs = self._cymbal.FindReferences(symbol_name, limit)
+        return [self._ref_to_dict(r) for r in refs]
     
     @property
     def db_path(self):
         """Get current database path."""
-        return self._cymbal.GetDBPath()
+        return str(self._cymbal.GetDBPath())
     
     @db_path.setter
     def db_path(self, path):
