@@ -66,17 +66,17 @@ with cymbal.Cymbal() as c:
     # Search for symbols
     results = c.search("handleAuth", limit=10)
     for symbol in results:
-        print(f"{symbol.name} ({symbol.kind}) at {symbol.file}:{symbol.start_line}")
+        print(f"{symbol['name']} ({symbol['kind']}) at {symbol['file']}:{symbol['start_line']}")
     
     # Investigate a specific symbol
     investigation = c.investigate("UserModel")
-    print(f"Definition: {investigation.definition}")
-    print(f"References: {len(investigation.references)}")
+    print(f"Symbol: {investigation['symbol']['name']}")
+    print(f"References: {len(investigation['refs'])}")
     
     # Find references to a symbol
     references = c.find_references("DatabaseConnection", limit=20)
     for ref in references:
-        print(f"Reference at {ref.file}:{ref.line}")
+        print(f"Reference at {ref['file']}:{ref['line']}")
 ```
 
 ### Convenience Functions
@@ -109,7 +109,7 @@ try:
     
     # Process results
     for symbol in results:
-        print(f"Found: {symbol.name} in {symbol.file}")
+        print(f"Found: {symbol['name']} in {symbol['file']}")
         
 except Exception as e:
     print(f"Error: {e}")
