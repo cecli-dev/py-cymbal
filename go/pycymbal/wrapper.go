@@ -91,11 +91,11 @@ func (c *PythonCymbal) Search(query string, limit int) ([]SymbolResult, error) {
 }
 
 // Investigate investigates a specific symbol
-func (c *PythonCymbal) Investigate(symbolName string) (*InvestigateResult, error) {
+func (c *PythonCymbal) Investigate(symbolName string, fileHint string) (*InvestigateResult, error) {
 	if c.dbPath == "" {
 		return nil, fmt.Errorf("no database path set - call Index first")
 	}
-	res, err := index.Investigate(c.dbPath, symbolName)
+	res, err := index.Investigate(c.dbPath, symbolName, index.InvestigateOpts{FileHint: fileHint})
 	if err != nil {
 		return nil, err
 	}

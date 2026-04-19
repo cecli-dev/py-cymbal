@@ -97,12 +97,13 @@ class Cymbal:
         results = self._cymbal.Search(query, limit)
         return [self._symbol_to_dict(s) for s in results]
     
-    def investigate(self, symbol_name):
+    def investigate(self, symbol_name, file_hint=""):
         """
         Investigate a specific symbol.
         
         Args:
             symbol_name (str): Name of symbol to investigate.
+            file_hint (str, optional): Filter matches to symbols in this file path.
             
         Returns:
             dict: Investigation result with definition and references.
@@ -110,7 +111,7 @@ class Cymbal:
         Raises:
             Exception: If investigation fails or no database is available.
         """
-        res = self._cymbal.Investigate(symbol_name)
+        res = self._cymbal.Investigate(symbol_name, file_hint)
         if not res:
             return None
             
@@ -180,13 +181,13 @@ def search_symbols(query, limit=20, db_path=None):
     finally:
         c.close()
 
-def investigate_symbol(symbol_name, db_path=None):
+def investigate_symbol(symbol_name, file_hint="", db_path=None):
     """Convenience function to investigate a symbol."""
     c = Cymbal()
     if db_path:
         c.db_path = db_path
     try:
-        return c.investigate(symbol_name)
+        return c.investigate(symbol_name, file_hint)
     finally:
         c.close()
 
