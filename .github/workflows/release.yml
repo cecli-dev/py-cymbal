@@ -34,6 +34,10 @@ jobs:
         go install github.com/go-python/gopy@v0.4.8
         go install golang.org/x/tools/cmd/goimports@latest
         echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+        if [ "${{ matrix.os }}" = "windows-latest" ]; then
+          # Ensure gcc is available on Windows (usually via mingw)
+          echo "C:\msys64\mingw64\bin" >> $GITHUB_PATH
+        fi
 
     - name: Build Python bindings
       shell: bash

@@ -42,8 +42,21 @@ if [[ "$OS_NAME" == "Linux" ]]; then
     [ -f _pycymbal.so ] && mv _pycymbal.so ../python/cymbal/_pycymbal.linux.so
     [ -f pycymbal_go.so ] && mv pycymbal_go.so ../python/cymbal/pycymbal_go.linux.so
 elif [[ "$OS_NAME" == *"MINGW"* ]] || [[ "$OS_NAME" == *"MSYS"* ]] || [[ "$OS_NAME" == *"CYGWIN"* ]] || [[ "$OS_NAME" == "Windows_NT" ]]; then
-    make build LIBEXT=.dll
-    [ -f _pycymbal.so ] && mv _pycymbal.so ../python/cymbal/_pycymbal.windows.pyd
+    echo "Building for Windows (manual)..."
+    # Manual build for Windows to avoid Makefile 'missing separator' issues
+    goimports -w pycymbal.go
+    go build -buildmode=c-shared -o pycymbal_go.dll pycymbal.go
+    python3 build.py
+    
+    # Get Python include and lib paths
+    PY_INC=$(python3 -c "import sysconfig; print(sysconfig.get_path('include'))")
+    PY_LIB=$(python3 -c "import sysconfig; print(sysconfig.get_config_var('LIBDIR') or '')")
+    PY_VER=$(python3 -c "import sys; print(f'{sys.version_info.major}{sys.version_info.minor}')")
+    
+    # Compile the C extension
+    gcc pycymbal.c pycymbal_go.dll -o _pycymbal.pyd -I"$PY_INC" -L"$PY_LIB" -lpython$PY_VER -shared -w
+    
+    [ -f _pycymbal.pyd ] && mv _pycymbal.pyd ../python/cymbal/_pycymbal.windows.pyd
     [ -f pycymbal_go.dll ] && mv pycymbal_go.dll ../python/cymbal/pycymbal_go.windows.dll
 elif [[ "$OS_NAME" == "Darwin" ]]; then
     make build LIBEXT=.dylib
