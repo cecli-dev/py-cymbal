@@ -16,7 +16,7 @@ def _load_binary():
     import importlib.util
     import platform
     
-    pkg_dir = os.path.dirname(__file__)
+    pkg_dir = os.path.dirname(os.path.abspath(__file__))
     system = platform.system().lower()
     # Map platform to expected binary extensions
     ext_map = {
@@ -98,7 +98,7 @@ try:
 except Exception as e:
     # Diagnostic for Windows loading failures
     if sys.platform == "win32" and isinstance(e, ImportError):
-        pkg_dir = os.path.dirname(__file__)
+        pkg_dir = os.path.abspath(os.path.dirname(__file__))
         go_dll = os.path.join(pkg_dir, "pycymbal_go.dll")
         if os.path.exists(go_dll):
             try:

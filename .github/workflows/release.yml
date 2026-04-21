@@ -92,7 +92,7 @@ jobs:
       run: |
         mkdir -p python/cymbal
         cp binaries/* python/cymbal/
-        mv python/cymbal/setup.py .
+        [ -f python/cymbal/setup.py ] && mv python/cymbal/setup.py . || echo "setup.py not found in binaries, using repo version"
 
     - name: Build universal wheel
       run: |
