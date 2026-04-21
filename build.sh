@@ -45,6 +45,8 @@ elif [[ "$OS_NAME" == *"MINGW"* ]] || [[ "$OS_NAME" == *"MSYS"* ]] || [[ "$OS_NA
     echo "Building for Windows (manual)..."
     # Manual build for Windows to avoid Makefile 'missing separator' issues
     goimports -w pycymbal.go
+    # Fix 'two or more data types in declaration specifiers' error for bool on Windows
+    sed -i 's/typedef uint8_t bool;/\/\/ typedef uint8_t bool;/' pycymbal.go
     go build -buildmode=c-shared -o pycymbal_go.dll pycymbal.go
     python3 build.py
     
