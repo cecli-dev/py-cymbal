@@ -57,6 +57,41 @@ def _load_binary():
             if others:
                 error_msg += f" Found binaries for: {', '.join(others)}. You may need to rebuild for the current platform."
             raise ImportError(error_msg)
+    # Map platform to our specific Go shared library names
+    lib_map = {
+        "linux": (".linux.so", "pycymbal_go.so"),
+        "windows": (".windows.dll", "pycymbal_go.dll"),
+        "darwin": (".darwin.dylib", "pycymbal_go.dylib")
+    }
+    
+    # On Windows, we must ensure the Go DLL is findable by the .pyd extension.
+    # The .pyd is compiled to look for 'pycymbal_go.dll', but we distribute it
+    # as 'pycymbal_go.windows.dll'. We'll create a link/copy if needed.
+    if system in lib_map:
+        suff, target_name = lib_map[system]
+        src_lib = os.path.join(pkg_dir, f"pycymbal_go{suff}")
+        dst_lib = os.path.join(pkg_dir, target_name)
+        
+        if os.path.exists(src_lib) and not os.path.exists(dst_lib):
+            try:
+                # Try symlink first, fallback to copy if on Windows without permissions
+                if hasattr(os, "symlink") and system != "windows":
+                    os.symlink(src_lib, dst_lib)
+                else:
+                    import shutil
+                    shutil.copy2(src_lib, dst_lib)
+            except Exception as e:
+                print(f"Warning: Could not create link from {src_lib} to {dst_lib}: {e}", file=sys.stderr)
+
+    # DLL search path for Windows Python 3.8+
+    if system == "windows":
+        if hasattr(os, "add_dll_directory"):
+            try:
+                os.add_dll_directory(pkg_dir)
+            except Exception:
+                pass
+        # Add to PATH as well for older Python versions or specific loader behaviors
+        os.environ['PATH'] = pkg_dir + os.path.pathsep + os.environ.get('PATH', '')
 
     # Load the module
     spec = importlib.util.spec_from_file_location("cymbal._pycymbal", binary_path)

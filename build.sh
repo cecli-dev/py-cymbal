@@ -56,7 +56,8 @@ elif [[ "$OS_NAME" == *"MINGW"* ]] || [[ "$OS_NAME" == *"MSYS"* ]] || [[ "$OS_NA
     PY_VER=$(python3 -c "import sys; print(f'{sys.version_info.major}{sys.version_info.minor}')")
     
     # Compile the C extension
-    gcc pycymbal.c pycymbal_go.dll -o _pycymbal.pyd -I"$PY_INC" -L"$PY_LIB" -lpython$PY_VER -shared -w
+    # Compile the C extension with static linking for MinGW runtimes to avoid DLL dependency issues
+    gcc pycymbal.c pycymbal_go.dll -o _pycymbal.pyd -I"$PY_INC" -L"$PY_LIB" -lpython$PY_VER -shared -w -static-libgcc -static-libstdc++ -Wl,-Bstatic -lwinpthread -Wl,-Bdynamic
     
     [ -f _pycymbal.pyd ] && mv _pycymbal.pyd ../python/cymbal/_pycymbal.windows.pyd
     [ -f pycymbal_go.dll ] && mv pycymbal_go.dll ../python/cymbal/pycymbal_go.windows.dll
@@ -115,7 +116,7 @@ dll_files = glob.glob("python/cymbal/pycymbal_go*")
 
 setup(
     name="py-cymbal",
-    version="0.1.13",
+    version="0.1.14",
     description="Python bindings for Cymbal code indexing and symbol discovery",
     author="Cymbal Contributors",
     author_email="contact@example.com",
