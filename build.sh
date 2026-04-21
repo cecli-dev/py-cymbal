@@ -25,10 +25,11 @@ cd go
 gopy gen -vm=python3 ./pycymbal
 cd ..
 
+OS_NAME=$(uname -s)
 # Inject rpath fix into the generated Makefile (Linux/macOS only)
-if [[ "$OSTYPE" == "darwin"* ]]; then
+if [[ "$OS_NAME" == "Darwin" ]]; then
     sed -i '' "s|pycymbal_go\$(LIBEXT) -o _pycymbal\$(LIBEXT) |pycymbal_go\$(LIBEXT) -o _pycymbal\$(LIBEXT) -Wl,-rpath,'\$\$ORIGIN' |" go/Makefile
-elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+elif [[ "$OS_NAME" == "Linux" ]]; then
     sed -i "s|pycymbal_go\$(LIBEXT) -o _pycymbal\$(LIBEXT) |pycymbal_go\$(LIBEXT) -o _pycymbal\$(LIBEXT) -Wl,-rpath,'\$\$ORIGIN' |" go/Makefile
 fi
 # Build
@@ -36,17 +37,19 @@ echo "Building for host platform..."
 cd go
 
 # Use standard LIBEXT for the current platform
-if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+if [[ "$OS_NAME" == "Linux" ]]; then
     make build LIBEXT=.so
     [ -f _pycymbal.so ] && mv _pycymbal.so ../python/cymbal/_pycymbal.linux.so
     [ -f pycymbal_go.so ] && mv pycymbal_go.so ../python/cymbal/pycymbal_go.linux.so
-elif [[ "$OSTYPE" == "msys"* ]] || [[ "$OSTYPE" == "cygwin"* ]] || [[ "$OS" == "Windows_NT" ]]; then
+elif [[ "$OS_NAME" == *"MINGW"* ]] || [[ "$OS_NAME" == *"MSYS"* ]] || [[ "$OS_NAME" == *"CYGWIN"* ]] || [[ "$OS_NAME" == "Windows_NT" ]]; then
     make build LIBEXT=.dll
     [ -f _pycymbal.so ] && mv _pycymbal.so ../python/cymbal/_pycymbal.windows.pyd
     [ -f pycymbal_go.dll ] && mv pycymbal_go.dll ../python/cymbal/pycymbal_go.windows.dll
-elif [[ "$OSTYPE" == "darwin"* ]]; then
+elif [[ "$OS_NAME" == "Darwin" ]]; then
     make build LIBEXT=.dylib
+    ls -la
     [ -f _pycymbal.so ] && mv _pycymbal.so ../python/cymbal/_pycymbal.darwin.dylib
+    [ -f _pycymbal.dylib ] && mv _pycymbal.dylib ../python/cymbal/_pycymbal.darwin.dylib
     [ -f pycymbal_go.dylib ] && mv pycymbal_go.dylib ../python/cymbal/pycymbal_go.darwin.dylib
 else
     make build
