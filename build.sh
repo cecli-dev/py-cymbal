@@ -52,7 +52,7 @@ elif [[ "$OS_NAME" == *"MINGW"* ]] || [[ "$OS_NAME" == *"MSYS"* ]] || [[ "$OS_NA
     
     # Get Python include and lib paths
     PY_INC=$(python3 -c "import sysconfig; print(sysconfig.get_path('include'))")
-    PY_LIB=$(python3 -c "import sysconfig; print(sysconfig.get_config_var('LIBDIR') or '')")
+    PY_LIB=$(python3 -c "import sysconfig; import os; print(os.path.join(sysconfig.get_config_var('installed_base'), 'libs'))")
     PY_VER=$(python3 -c "import sys; print(f'{sys.version_info.major}{sys.version_info.minor}')")
     
     # Compile the C extension
