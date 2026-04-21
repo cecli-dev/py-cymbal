@@ -47,6 +47,8 @@ elif [[ "$OS_NAME" == *"MINGW"* ]] || [[ "$OS_NAME" == *"MSYS"* ]] || [[ "$OS_NA
     goimports -w pycymbal.go
     # Fix 'two or more data types in declaration specifiers' error for bool on Windows
     sed -i 's/typedef uint8_t bool;/\/\/ typedef uint8_t bool;/' pycymbal.go
+    # Use static linking for CGO components in the Go DLL
+    export CGO_LDFLAGS="-static-libgcc -static-libstdc++ -Wl,-Bstatic -lwinpthread -Wl,-Bdynamic"
     go build -buildmode=c-shared -o pycymbal_go.dll pycymbal.go
     python3 build.py
     
@@ -116,7 +118,7 @@ dll_files = glob.glob("python/cymbal/pycymbal_go*")
 
 setup(
     name="py-cymbal",
-    version="0.1.14",
+    version="0.1.15",
     description="Python bindings for Cymbal code indexing and symbol discovery",
     author="Cymbal Contributors",
     author_email="contact@example.com",

@@ -6,17 +6,10 @@ programmatic access to code symbol analysis, search, and reference finding.
 """
 import os
 import sys
-
-# Windows DLL support: Since Python 3.8, we must explicitly add the package 
-# directory to the DLL search path so _pycymbal.pyd can find pycymbal_go.dll
-if sys.platform == "win32" and hasattr(os, "add_dll_directory"):
-    pkg_dir = os.path.abspath(os.path.dirname(__file__))
-    if pkg_dir and os.path.isdir(pkg_dir):
-        os.add_dll_directory(pkg_dir)
-        # Also add to PATH for older Python versions or specific environments
-        os.environ['PATH'] = pkg_dir + os.path.pathsep + os.environ.get('PATH', '')
-
-cwd = os.getcwd()
+import platform
+import ctypes
+import importlib.util
+import shutil
 
 # Platform-specific binary loading
 def _load_binary():
@@ -25,48 +18,21 @@ def _load_binary():
     
     pkg_dir = os.path.dirname(__file__)
     system = platform.system().lower()
-    
-    # Map platform to our specific binary names
+    # Map platform to expected binary extensions
     ext_map = {
         "linux": ".linux.so",
         "windows": ".windows.pyd",
         "darwin": ".darwin.dylib"
     }
-    
-    suffix = ext_map.get(system)
-    if not suffix:
-        raise ImportError(f"Unsupported platform: {system}")
-        
-    binary_path = os.path.join(pkg_dir, f"_pycymbal{suffix}")
-    if not os.path.exists(binary_path):
-        # Fallback to standard name if platform-specific one isn't found
-        # (useful for local development/single-platform builds)
-        for fallback in [".so", ".pyd", ".dylib"]:
-            p = os.path.join(pkg_dir, f"_pycymbal{fallback}")
-            if os.path.exists(p):
-                binary_path = p
-                break
-        else:
-            # Check if binaries for OTHER platforms exist to provide a better error
-            others = []
-            for plat, suff in ext_map.items():
-                if os.path.exists(os.path.join(pkg_dir, f"_pycymbal{suff}")):
-                    others.append(plat)
-            
-            error_msg = f"Could not find _pycymbal binary for {system} at {pkg_dir}."
-            if others:
-                error_msg += f" Found binaries for: {', '.join(others)}. You may need to rebuild for the current platform."
-            raise ImportError(error_msg)
+
     # Map platform to our specific Go shared library names
     lib_map = {
         "linux": (".linux.so", "pycymbal_go.so"),
         "windows": (".windows.dll", "pycymbal_go.dll"),
         "darwin": (".darwin.dylib", "pycymbal_go.dylib")
     }
-    
-    # On Windows, we must ensure the Go DLL is findable by the .pyd extension.
-    # The .pyd is compiled to look for 'pycymbal_go.dll', but we distribute it
-    # as 'pycymbal_go.windows.dll'. We'll create a link/copy if needed.
+
+    # Ensure the Go shared library is available under its standard name
     if system in lib_map:
         suff, target_name = lib_map[system]
         src_lib = os.path.join(pkg_dir, f"pycymbal_go{suff}")
@@ -74,7 +40,6 @@ def _load_binary():
         
         if os.path.exists(src_lib) and not os.path.exists(dst_lib):
             try:
-                # Try symlink first, fallback to copy if on Windows without permissions
                 if hasattr(os, "symlink") and system != "windows":
                     os.symlink(src_lib, dst_lib)
                 else:
@@ -83,17 +48,37 @@ def _load_binary():
             except Exception as e:
                 print(f"Warning: Could not create link from {src_lib} to {dst_lib}: {e}", file=sys.stderr)
 
-    # DLL search path for Windows Python 3.8+
+    # Setup DLL search path for Windows
     if system == "windows":
         if hasattr(os, "add_dll_directory"):
             try:
                 os.add_dll_directory(pkg_dir)
             except Exception:
                 pass
-        # Add to PATH as well for older Python versions or specific loader behaviors
         os.environ['PATH'] = pkg_dir + os.path.pathsep + os.environ.get('PATH', '')
 
-    # Load the module
+    # Determine binary path
+    suffix = ext_map.get(system)
+    if not suffix:
+        raise ImportError(f"Unsupported platform: {system}")
+        
+    binary_path = os.path.join(pkg_dir, f"_pycymbal{suffix}")
+    if not os.path.exists(binary_path):
+        for fallback in [".so", ".pyd", ".dylib"]:
+            p = os.path.join(pkg_dir, f"_pycymbal{fallback}")
+            if os.path.exists(p):
+                binary_path = p
+                break
+        else:
+            others = []
+            for plat, suff in ext_map.items():
+                if os.path.exists(os.path.join(pkg_dir, f"_pycymbal{suff}")):
+                    others.append(plat)
+            error_msg = f"Could not find _pycymbal binary for {system} at {pkg_dir}."
+            if others:
+                error_msg += f" Found binaries for: {', '.join(others)}."
+            raise ImportError(error_msg)
+
     spec = importlib.util.spec_from_file_location("cymbal._pycymbal", binary_path)
     mod = importlib.util.module_from_spec(spec)
     # Inject into sys.modules and the current package's namespace
@@ -111,7 +96,18 @@ def _load_binary():
 try:
     _load_binary()
 except Exception as e:
-    # Print error but don't swallow it completely if it's an ImportError
+    # Diagnostic for Windows loading failures
+    if sys.platform == "win32" and isinstance(e, ImportError):
+        pkg_dir = os.path.dirname(__file__)
+        go_dll = os.path.join(pkg_dir, "pycymbal_go.dll")
+        if os.path.exists(go_dll):
+            try:
+                ctypes.WinDLL(go_dll)
+            except Exception as dll_e:
+                print(f"Error: pycymbal_go.dll is present but cannot be loaded: {dll_e}", file=sys.stderr)
+                print("This usually indicates missing runtime dependencies (e.g. MinGW/VC++ redistributables).", file=sys.stderr)
+    
+    # Print original error but don't swallow it completely if it's an ImportError
     if isinstance(e, ImportError):
         print(f"Error loading cymbal binary: {e}", file=sys.stderr)
     pass
