@@ -47,7 +47,16 @@ def _load_binary():
                 binary_path = p
                 break
         else:
-            raise ImportError(f"Could not find _pycymbal binary at {pkg_dir}")
+            # Check if binaries for OTHER platforms exist to provide a better error
+            others = []
+            for plat, suff in ext_map.items():
+                if os.path.exists(os.path.join(pkg_dir, f"_pycymbal{suff}")):
+                    others.append(plat)
+            
+            error_msg = f"Could not find _pycymbal binary for {system} at {pkg_dir}."
+            if others:
+                error_msg += f" Found binaries for: {', '.join(others)}. You may need to rebuild for the current platform."
+            raise ImportError(error_msg)
 
     # Load the module
     spec = importlib.util.spec_from_file_location("cymbal._pycymbal", binary_path)
@@ -66,7 +75,10 @@ def _load_binary():
 
 try:
     _load_binary()
-except Exception:
+except Exception as e:
+    # Print error but don't swallow it completely if it's an ImportError
+    if isinstance(e, ImportError):
+        print(f"Error loading cymbal binary: {e}", file=sys.stderr)
     pass
 
 # Move imports inside to avoid circular dependencies with generated submodules

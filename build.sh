@@ -92,6 +92,16 @@ if [ -f python/cymbal/_pycymbal.darwin.dylib ]; then
     echo "Patching rpath for macOS..."
     install_name_tool -change pycymbal_go.dylib @loader_path/pycymbal_go.darwin.dylib python/cymbal/_pycymbal.darwin.dylib
 fi
+# Create MANIFEST.in to ensure binary files are included in the wheel
+echo "Creating MANIFEST.in..."
+cat > MANIFEST.in << 'MANIFESTEOF'
+include python/cymbal/*.so
+include python/cymbal/*.pyd
+include python/cymbal/*.dll
+include python/cymbal/*.dylib
+include python/cymbal/_pycymbal*
+MANIFESTEOF
+
 # Create setup.py for pip installation
 echo "Creating setup.py..."
 cat > setup.py << 'SETUPEOF'
@@ -105,7 +115,7 @@ dll_files = glob.glob("python/cymbal/pycymbal_go*")
 
 setup(
     name="py-cymbal",
-    version="0.1.11",
+    version="0.1.12",
     description="Python bindings for Cymbal code indexing and symbol discovery",
     author="Cymbal Contributors",
     author_email="contact@example.com",
@@ -119,6 +129,7 @@ setup(
     python_requires=">=3.7",
     license="MIT",
     license_files=[],
+    include_package_data=True,
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",
