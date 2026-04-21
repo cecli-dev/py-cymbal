@@ -105,7 +105,7 @@ dll_files = glob.glob("python/cymbal/pycymbal_go*")
 
 setup(
     name="py-cymbal",
-    version="0.1.9",
+    version="0.1.10",
     description="Python bindings for Cymbal code indexing and symbol discovery",
     author="Cymbal Contributors",
     author_email="contact@example.com",
@@ -118,6 +118,7 @@ setup(
     install_requires=[],
     python_requires=">=3.7",
     license="MIT",
+    license_files=[],
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",
