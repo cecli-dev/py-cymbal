@@ -30,7 +30,7 @@ jobs:
       shell: bash
       run: |
         python -m pip install --upgrade pip
-        pip install build setuptools wheel pybindgen
+        pip install --upgrade build setuptools wheel pybindgen twine
         go install github.com/go-python/gopy@v0.4.8
         go install golang.org/x/tools/cmd/goimports@latest
         echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
@@ -96,7 +96,7 @@ jobs:
 
     - name: Build universal wheel
       run: |
-        pip install build
+        pip install --upgrade build setuptools wheel twine
         python -m build --wheel
 
     - name: Upload wheel
