@@ -14,8 +14,12 @@ if sys.platform == "win32" and hasattr(os, "add_dll_directory"):
     if pkg_dir:
         os.add_dll_directory(pkg_dir)
 
+cwd = os.getcwd()
+
 from . import pycymbal
 from . import go
+
+os.chdir(cwd)
 
 class Cymbal:
     """Main interface to Cymbal functionality."""
