@@ -26,7 +26,9 @@ gopy gen -vm=python3 ./pycymbal
 cd ..
 
 # Inject rpath fix into the generated Makefile (Linux/macOS only)
-if [[ "$OSTYPE" == "linux-gnu"* ]] || [[ "$OSTYPE" == "darwin"* ]]; then
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    sed -i '' "s|pycymbal_go\$(LIBEXT) -o _pycymbal\$(LIBEXT) |pycymbal_go\$(LIBEXT) -o _pycymbal\$(LIBEXT) -Wl,-rpath,'\$\$ORIGIN' |" go/Makefile
+elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
     sed -i "s|pycymbal_go\$(LIBEXT) -o _pycymbal\$(LIBEXT) |pycymbal_go\$(LIBEXT) -o _pycymbal\$(LIBEXT) -Wl,-rpath,'\$\$ORIGIN' |" go/Makefile
 fi
 # Build
