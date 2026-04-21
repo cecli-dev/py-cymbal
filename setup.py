@@ -8,7 +8,7 @@ if os.path.exists("python/cymbal/_pycymbal.so"):
 
 setup(
     name="py-cymbal",
-    version="0.1.6",
+    version="0.1.7",
     description="Python bindings for Cymbal code indexing and symbol discovery",
     author="Cymbal Contributors",
     author_email="contact@example.com",

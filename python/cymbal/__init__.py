@@ -10,17 +10,63 @@ import sys
 # Windows DLL support: Since Python 3.8, we must explicitly add the package 
 # directory to the DLL search path so _pycymbal.pyd can find pycymbal_go.dll
 if sys.platform == "win32" and hasattr(os, "add_dll_directory"):
-    pkg_dir = os.path.dirname(__file__)
-    if pkg_dir:
+    pkg_dir = os.path.abspath(os.path.dirname(__file__))
+    if pkg_dir and os.path.isdir(pkg_dir):
         os.add_dll_directory(pkg_dir)
+        # Also add to PATH for older Python versions or specific environments
+        os.environ['PATH'] = pkg_dir + os.path.pathsep + os.environ.get('PATH', '')
 
 cwd = os.getcwd()
 
-from . import pycymbal
+# Platform-specific binary loading
+def _load_binary():
+    import importlib.util
+    import platform
+    
+    pkg_dir = os.path.dirname(__file__)
+    system = platform.system().lower()
+    
+    # Map platform to our specific binary names
+    ext_map = {
+        "linux": ".linux.so",
+        "windows": ".windows.pyd",
+        "darwin": ".darwin.dylib"
+    }
+    
+    suffix = ext_map.get(system)
+    if not suffix:
+        raise ImportError(f"Unsupported platform: {system}")
+        
+    binary_path = os.path.join(pkg_dir, f"_pycymbal{suffix}")
+    if not os.path.exists(binary_path):
+        # Fallback to standard name if platform-specific one isn't found
+        # (useful for local development/single-platform builds)
+        for fallback in [".so", ".pyd", ".dylib"]:
+            p = os.path.join(pkg_dir, f"_pycymbal{fallback}")
+            if os.path.exists(p):
+                binary_path = p
+                break
+        else:
+            raise ImportError(f"Could not find _pycymbal binary at {pkg_dir}")
+
+    # Load the module
+    spec = importlib.util.spec_from_file_location("cymbal._pycymbal", binary_path)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["cymbal._pycymbal"] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+# Import go module for type hints
+
+# Load the binary and populate sys.modules before importing submodules
+try:
+    _load_binary()
+except Exception:
+    # Allow import for documentation/etc even if binary is missing
+    pass
+
+# Import go module for type hints
 from . import go
-
-os.chdir(cwd)
-
 class Cymbal:
     """Main interface to Cymbal functionality."""
     
@@ -31,9 +77,14 @@ class Cymbal:
         Args:
             repo_path (str, optional): Path to repository to index immediately.
         """
-        self._cymbal = pycymbal.NewCymbal()
-        if repo_path:
-            self.index(repo_path)
+        cwd = os.getcwd()
+        try:
+            from . import pycymbal
+            self._cymbal = pycymbal.NewCymbal()
+            if repo_path:
+                self.index(repo_path)
+        finally:
+            os.chdir(cwd)
     
     def _symbol_to_dict(self, symbol):
         """Convert a SymbolResult to a dictionary."""

@@ -7,14 +7,14 @@ on:
       - 'v[0-9]+.[0-9]+.[0-9]+'
 
 jobs:
-  publish:
-    runs-on: ubuntu-latest
+  build-binaries:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        ref: ${{ github.ref }}
 
     - name: Set up Go
       uses: actions/setup-go@v5
@@ -27,22 +27,95 @@ jobs:
         python-version: '3.12'
 
     - name: Install dependencies
+      shell: bash
       run: |
         python -m pip install --upgrade pip
-        pip install build setuptools wheel twine pybindgen
+        pip install build setuptools wheel pybindgen
         go install github.com/go-python/gopy@v0.4.8
         go install golang.org/x/tools/cmd/goimports@latest
         echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+
     - name: Build Python bindings
+      shell: bash
       run: |
-        # Ensure CGO flags are set for SQLite FTS5
         export CGO_CFLAGS="-DSQLITE_ENABLE_FTS5"
         ./build.sh
 
-    - name: Build and publish
+    - name: Rename and Upload binaries
+      shell: bash
+      run: |
+        mkdir -p binary-artifacts
+        if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+          cp python/cymbal/_pycymbal.linux.so binary-artifacts/ || cp python/cymbal/_pycymbal.so binary-artifacts/_pycymbal.linux.so
+          cp python/cymbal/pycymbal_go.linux.so binary-artifacts/ || cp python/cymbal/pycymbal_go.so binary-artifacts/pycymbal_go.linux.so
+        elif [ "${{ matrix.os }}" = "windows-latest" ]; then
+          cp python/cymbal/_pycymbal.windows.pyd binary-artifacts/ || cp python/cymbal/_pycymbal.pyd binary-artifacts/_pycymbal.windows.pyd
+          cp python/cymbal/pycymbal_go.windows.dll binary-artifacts/ || cp python/cymbal/pycymbal_go.dll binary-artifacts/pycymbal_go.windows.dll
+        elif [ "${{ matrix.os }}" = "macos-latest" ]; then
+          cp python/cymbal/_pycymbal.darwin.dylib binary-artifacts/ || cp python/cymbal/_pycymbal.dylib binary-artifacts/_pycymbal.darwin.dylib
+          cp python/cymbal/pycymbal_go.darwin.dylib binary-artifacts/ || cp python/cymbal/pycymbal_go.dylib binary-artifacts/pycymbal_go.darwin.dylib
+        fi
+        cp python/cymbal/pycymbal.py binary-artifacts/
+        cp python/cymbal/go.py binary-artifacts/
+        cp setup.py binary-artifacts/
+
+    - name: Upload binaries
+      uses: actions/upload-artifact@v4
+      with:
+        name: binaries-${{ matrix.os }}
+        path: binary-artifacts/*
+
+  build-wheel:
+    needs: build-binaries
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Download all binaries
+      uses: actions/download-artifact@v4
+      with:
+        path: binaries
+        pattern: binaries-*
+        merge-multiple: true
+
+    - name: Organize package
+      run: |
+        mkdir -p python/cymbal
+        cp binaries/* python/cymbal/
+        mv python/cymbal/setup.py .
+
+    - name: Build universal wheel
+      run: |
+        pip install build
+        python -m build --wheel
+
+    - name: Upload wheel
+      uses: actions/upload-artifact@v4
+      with:
+        name: universal-wheel
+        path: dist/*.whl
+
+  publish:
+    needs: build-wheel
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+    - name: Download wheel
+      uses: actions/download-artifact@v4
+      with:
+        name: universal-wheel
+        path: dist
+
+    - name: Publish to PyPI
       env:
         TWINE_USERNAME: __token__
         TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
       run: |
-        python -m build
-        twine upload dist/*
+        pip install twine
+        twine upload dist/*.whl

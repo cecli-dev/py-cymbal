@@ -6,45 +6,71 @@ set -e  # Exit on error
 echo "Building py-cymbal Python bindings..."
 
 # Set up environment
-export PATH=$HOME/go/bin:$HOME/.local/bin:$(go env GOPATH)/bin:$PATH
+export PATH=$HOME/go/bin:$HOME/.local/bin:$(go env GOPATH 2>/dev/null)/bin:/usr/local/go/bin:$PATH
 export CGO_CFLAGS="-DSQLITE_ENABLE_FTS5 $(python3 -c 'import sysconfig; print("-I" + sysconfig.get_path("include"))')"
 # Clean previous builds
 echo "Cleaning previous builds..."
-rm -rf python/cymbal/_pycymbal*.so python/cymbal/*.pyc __pycache__ build dist *.egg-info
+rm -rf python/cymbal/_pycymbal* python/cymbal/*.pyc __pycache__ build dist *.egg-info
 
 # Build Go wrapper and generate Python bindings
 echo "Building Go wrapper and generating Python bindings..."
-cd go
+# We will cd into go inside build_target or for gopy gen
 
 # Clean generated files
-rm -f pycymbal.go pycymbal.py go.py __init__.py build.py Makefile pycymbal.c pycymbal_go.so _pycymbal.so
+rm -f pycymbal.go pycymbal.py go.py __init__.py build.py Makefile pycymbal.c pycymbal_go.* _pycymbal.*
 
 # Generate Python bindings with gopy
 echo "Generating Python bindings with gopy..."
+cd go
 gopy gen -vm=python3 ./pycymbal
-# Inject rpath fix into the generated Makefile
-sed -i "s|pycymbal_go\$(LIBEXT) -o _pycymbal\$(LIBEXT) |pycymbal_go\$(LIBEXT) -o _pycymbal\$(LIBEXT) -Wl,-rpath,'\$\$ORIGIN' |" Makefile
-make build
+cd ..
+
+# Inject rpath fix into the generated Makefile (Linux/macOS only)
+if [[ "$OSTYPE" == "linux-gnu"* ]] || [[ "$OSTYPE" == "darwin"* ]]; then
+    sed -i "s|pycymbal_go\$(LIBEXT) -o _pycymbal\$(LIBEXT) |pycymbal_go\$(LIBEXT) -o _pycymbal\$(LIBEXT) -Wl,-rpath,'\$\$ORIGIN' |" go/Makefile
+fi
+# Build
+echo "Building for host platform..."
+cd go
+
+# Use standard LIBEXT for the current platform
+if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    make build LIBEXT=.so
+    [ -f _pycymbal.so ] && mv _pycymbal.so ../python/cymbal/_pycymbal.linux.so
+    [ -f pycymbal_go.so ] && mv pycymbal_go.so ../python/cymbal/pycymbal_go.linux.so
+elif [[ "$OSTYPE" == "msys"* ]] || [[ "$OSTYPE" == "cygwin"* ]] || [[ "$OS" == "Windows_NT" ]]; then
+    make build LIBEXT=.dll
+    [ -f _pycymbal.so ] && mv _pycymbal.so ../python/cymbal/_pycymbal.windows.pyd
+    [ -f pycymbal_go.dll ] && mv pycymbal_go.dll ../python/cymbal/pycymbal_go.windows.dll
+elif [[ "$OSTYPE" == "darwin"* ]]; then
+    make build LIBEXT=.dylib
+    [ -f _pycymbal.so ] && mv _pycymbal.so ../python/cymbal/_pycymbal.darwin.dylib
+    [ -f pycymbal_go.dylib ] && mv pycymbal_go.dylib ../python/cymbal/pycymbal_go.darwin.dylib
+else
+    make build
+fi
+mkdir -p ../python/cymbal
+mv pycymbal.py go.py ../python/cymbal/
+cd ..
+rm -f python/cymbal/pycymbal.c
 
 # Move files to python directory
 echo "Organizing Python module..."
 cd ..
-mv go/_pycymbal*.so go/pycymbal.py go/go.py python/cymbal/ 2>/dev/null || true
-mv go/pycymbal_go.so python/cymbal/ 2>/dev/null || true
+# Files are already moved by build_target or the mv commands above
 # Do NOT copy pycymbal.c to python/cymbal/ to avoid setuptools auto-detection failure
 rm -f python/cymbal/pycymbal.c
 
-# Fix rpath so _pycymbal.so can find pycymbal_go.so without LD_LIBRARY_PATH
-if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+# Fix rpath for Linux and macOS binaries if they exist
+if [ -f python/cymbal/_pycymbal.linux.so ]; then
     if command -v patchelf >/dev/null 2>&1; then
         echo "Patching rpath for Linux..."
-        patchelf --set-rpath '$ORIGIN' python/cymbal/_pycymbal.so
-    else
-        echo "Warning: patchelf not found. LD_LIBRARY_PATH will be required."
+        patchelf --set-rpath '$ORIGIN' python/cymbal/_pycymbal.linux.so
     fi
-elif [[ "$OSTYPE" == "darwin"* ]]; then
+fi
+if [ -f python/cymbal/_pycymbal.darwin.dylib ]; then
     echo "Patching rpath for macOS..."
-    install_name_tool -change pycymbal_go.so @loader_path/pycymbal_go.so python/cymbal/_pycymbal.so
+    install_name_tool -change pycymbal_go.dylib @loader_path/pycymbal_go.darwin.dylib python/cymbal/_pycymbal.darwin.dylib
 fi
 # Create setup.py for pip installation
 echo "Creating setup.py..."
@@ -53,20 +79,20 @@ from setuptools import setup, Extension
 import os
 
 # Check if we have the compiled extension
-ext_files = []
-if os.path.exists("python/cymbal/_pycymbal.so"):
-    ext_files = ["python/cymbal/_pycymbal.so"]
+import glob
+ext_files = glob.glob("python/cymbal/_pycymbal*")
+dll_files = glob.glob("python/cymbal/pycymbal_go*")
 
 setup(
     name="py-cymbal",
-    version="0.1.6",
+    version="0.1.7",
     description="Python bindings for Cymbal code indexing and symbol discovery",
     author="Cymbal Contributors",
     author_email="contact@example.com",
     url="https://github.com/dwash/py-cymbal",
     packages=["cymbal"],
     package_dir={"": "python"},
-    package_data={"cymbal": ["*.so", "*.py"]},
+    package_data={"cymbal": ["*.so", "*.pyd", "*.dll", "*.dylib", "*.py"]},
     ext_modules=[],
     zip_safe=False,
     install_requires=[],

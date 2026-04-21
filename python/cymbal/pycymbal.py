@@ -296,6 +296,218 @@ class Slice_pycymbal_SymbolResult(go.GoClass):
 
 # ---- Structs ---
 
+# Python type for struct pycymbal.RefResult
+class RefResult(go.GoClass):
+	"""RefResult represents a reference to a symbol\n"""
+	def __init__(self, *args, **kwargs):
+		"""
+		handle=A Go-side object is always initialized with an explicit handle=arg
+		otherwise parameters can be unnamed in order of field names or named fields
+		in which case a new Go object is constructed first
+		"""
+		if len(kwargs) == 1 and 'handle' in kwargs:
+			self.handle = kwargs['handle']
+			_pycymbal.IncRef(self.handle)
+		elif len(args) == 1 and isinstance(args[0], go.GoClass):
+			self.handle = args[0].handle
+			_pycymbal.IncRef(self.handle)
+		else:
+			self.handle = _pycymbal.pycymbal_RefResult_CTor()
+			_pycymbal.IncRef(self.handle)
+			if  0 < len(args):
+				self.File = args[0]
+			if "File" in kwargs:
+				self.File = kwargs["File"]
+			if  1 < len(args):
+				self.Line = args[1]
+			if "Line" in kwargs:
+				self.Line = kwargs["Line"]
+			if  2 < len(args):
+				self.RelPath = args[2]
+			if "RelPath" in kwargs:
+				self.RelPath = kwargs["RelPath"]
+			if  3 < len(args):
+				self.Name = args[3]
+			if "Name" in kwargs:
+				self.Name = kwargs["Name"]
+	def __del__(self):
+		_pycymbal.DecRef(self.handle)
+	def __str__(self):
+		pr = [(p, getattr(self, p)) for p in dir(self) if not p.startswith('__')]
+		sv = 'pycymbal.RefResult{'
+		first = True
+		for v in pr:
+			if callable(v[1]):
+				continue
+			if first:
+				first = False
+			else:
+				sv += ', '
+			sv += v[0] + '=' + str(v[1])
+		return sv + '}'
+	def __repr__(self):
+		pr = [(p, getattr(self, p)) for p in dir(self) if not p.startswith('__')]
+		sv = 'pycymbal.RefResult ( '
+		for v in pr:
+			if not callable(v[1]):
+				sv += v[0] + '=' + str(v[1]) + ', '
+		return sv + ')'
+	@property
+	def File(self):
+		return _pycymbal.pycymbal_RefResult_File_Get(self.handle)
+	@File.setter
+	def File(self, value):
+		if isinstance(value, go.GoClass):
+			_pycymbal.pycymbal_RefResult_File_Set(self.handle, value.handle)
+		else:
+			_pycymbal.pycymbal_RefResult_File_Set(self.handle, value)
+	@property
+	def Line(self):
+		return _pycymbal.pycymbal_RefResult_Line_Get(self.handle)
+	@Line.setter
+	def Line(self, value):
+		if isinstance(value, go.GoClass):
+			_pycymbal.pycymbal_RefResult_Line_Set(self.handle, value.handle)
+		else:
+			_pycymbal.pycymbal_RefResult_Line_Set(self.handle, value)
+	@property
+	def RelPath(self):
+		return _pycymbal.pycymbal_RefResult_RelPath_Get(self.handle)
+	@RelPath.setter
+	def RelPath(self, value):
+		if isinstance(value, go.GoClass):
+			_pycymbal.pycymbal_RefResult_RelPath_Set(self.handle, value.handle)
+		else:
+			_pycymbal.pycymbal_RefResult_RelPath_Set(self.handle, value)
+	@property
+	def Name(self):
+		return _pycymbal.pycymbal_RefResult_Name_Get(self.handle)
+	@Name.setter
+	def Name(self, value):
+		if isinstance(value, go.GoClass):
+			_pycymbal.pycymbal_RefResult_Name_Set(self.handle, value.handle)
+		else:
+			_pycymbal.pycymbal_RefResult_Name_Set(self.handle, value)
+
+# Python type for struct pycymbal.SymbolResult
+class SymbolResult(go.GoClass):
+	"""SymbolResult represents a code symbol found during indexing\n"""
+	def __init__(self, *args, **kwargs):
+		"""
+		handle=A Go-side object is always initialized with an explicit handle=arg
+		otherwise parameters can be unnamed in order of field names or named fields
+		in which case a new Go object is constructed first
+		"""
+		if len(kwargs) == 1 and 'handle' in kwargs:
+			self.handle = kwargs['handle']
+			_pycymbal.IncRef(self.handle)
+		elif len(args) == 1 and isinstance(args[0], go.GoClass):
+			self.handle = args[0].handle
+			_pycymbal.IncRef(self.handle)
+		else:
+			self.handle = _pycymbal.pycymbal_SymbolResult_CTor()
+			_pycymbal.IncRef(self.handle)
+			if  0 < len(args):
+				self.Name = args[0]
+			if "Name" in kwargs:
+				self.Name = kwargs["Name"]
+			if  1 < len(args):
+				self.Kind = args[1]
+			if "Kind" in kwargs:
+				self.Kind = kwargs["Kind"]
+			if  2 < len(args):
+				self.File = args[2]
+			if "File" in kwargs:
+				self.File = kwargs["File"]
+			if  3 < len(args):
+				self.StartLine = args[3]
+			if "StartLine" in kwargs:
+				self.StartLine = kwargs["StartLine"]
+			if  4 < len(args):
+				self.EndLine = args[4]
+			if "EndLine" in kwargs:
+				self.EndLine = kwargs["EndLine"]
+			if  5 < len(args):
+				self.Language = args[5]
+			if "Language" in kwargs:
+				self.Language = kwargs["Language"]
+	def __del__(self):
+		_pycymbal.DecRef(self.handle)
+	def __str__(self):
+		pr = [(p, getattr(self, p)) for p in dir(self) if not p.startswith('__')]
+		sv = 'pycymbal.SymbolResult{'
+		first = True
+		for v in pr:
+			if callable(v[1]):
+				continue
+			if first:
+				first = False
+			else:
+				sv += ', '
+			sv += v[0] + '=' + str(v[1])
+		return sv + '}'
+	def __repr__(self):
+		pr = [(p, getattr(self, p)) for p in dir(self) if not p.startswith('__')]
+		sv = 'pycymbal.SymbolResult ( '
+		for v in pr:
+			if not callable(v[1]):
+				sv += v[0] + '=' + str(v[1]) + ', '
+		return sv + ')'
+	@property
+	def Name(self):
+		return _pycymbal.pycymbal_SymbolResult_Name_Get(self.handle)
+	@Name.setter
+	def Name(self, value):
+		if isinstance(value, go.GoClass):
+			_pycymbal.pycymbal_SymbolResult_Name_Set(self.handle, value.handle)
+		else:
+			_pycymbal.pycymbal_SymbolResult_Name_Set(self.handle, value)
+	@property
+	def Kind(self):
+		return _pycymbal.pycymbal_SymbolResult_Kind_Get(self.handle)
+	@Kind.setter
+	def Kind(self, value):
+		if isinstance(value, go.GoClass):
+			_pycymbal.pycymbal_SymbolResult_Kind_Set(self.handle, value.handle)
+		else:
+			_pycymbal.pycymbal_SymbolResult_Kind_Set(self.handle, value)
+	@property
+	def File(self):
+		return _pycymbal.pycymbal_SymbolResult_File_Get(self.handle)
+	@File.setter
+	def File(self, value):
+		if isinstance(value, go.GoClass):
+			_pycymbal.pycymbal_SymbolResult_File_Set(self.handle, value.handle)
+		else:
+			_pycymbal.pycymbal_SymbolResult_File_Set(self.handle, value)
+	@property
+	def StartLine(self):
+		return _pycymbal.pycymbal_SymbolResult_StartLine_Get(self.handle)
+	@StartLine.setter
+	def StartLine(self, value):
+		if isinstance(value, go.GoClass):
+			_pycymbal.pycymbal_SymbolResult_StartLine_Set(self.handle, value.handle)
+		else:
+			_pycymbal.pycymbal_SymbolResult_StartLine_Set(self.handle, value)
+	@property
+	def EndLine(self):
+		return _pycymbal.pycymbal_SymbolResult_EndLine_Get(self.handle)
+	@EndLine.setter
+	def EndLine(self, value):
+		if isinstance(value, go.GoClass):
+			_pycymbal.pycymbal_SymbolResult_EndLine_Set(self.handle, value.handle)
+		else:
+			_pycymbal.pycymbal_SymbolResult_EndLine_Set(self.handle, value)
+	@property
+	def Language(self):
+		return _pycymbal.pycymbal_SymbolResult_Language_Get(self.handle)
+	@Language.setter
+	def Language(self, value):
+		if isinstance(value, go.GoClass):
+			_pycymbal.pycymbal_SymbolResult_Language_Set(self.handle, value.handle)
+		else:
+			_pycymbal.pycymbal_SymbolResult_Language_Set(self.handle, value)
+
 # Python type for struct pycymbal.ImpactResult
 class ImpactResult(go.GoClass):
 	"""ImpactResult represents a symbol impacted by changes\n"""
@@ -560,12 +772,12 @@ class PythonCymbal(go.GoClass):
 		Search searches for symbols matching the query
 		"""
 		return Slice_pycymbal_SymbolResult(handle=_pycymbal.pycymbal_PythonCymbal_Search(self.handle, query, limit))
-	def Investigate(self, symbolName):
-		"""Investigate(str symbolName) object, str
+	def Investigate(self, symbolName, fileHint):
+		"""Investigate(str symbolName, str fileHint) object, str
 		
 		Investigate investigates a specific symbol
 		"""
-		return InvestigateResult(handle=_pycymbal.pycymbal_PythonCymbal_Investigate(self.handle, symbolName))
+		return InvestigateResult(handle=_pycymbal.pycymbal_PythonCymbal_Investigate(self.handle, symbolName, fileHint))
 	def FindReferences(self, symbolName, limit):
 		"""FindReferences(str symbolName, int limit) []object, str
 		
@@ -584,218 +796,6 @@ class PythonCymbal(go.GoClass):
 		SetDBPath sets the database path directly (for testing or reuse)
 		"""
 		_pycymbal.pycymbal_PythonCymbal_SetDBPath(self.handle, path, goRun)
-
-# Python type for struct pycymbal.RefResult
-class RefResult(go.GoClass):
-	"""RefResult represents a reference to a symbol\n"""
-	def __init__(self, *args, **kwargs):
-		"""
-		handle=A Go-side object is always initialized with an explicit handle=arg
-		otherwise parameters can be unnamed in order of field names or named fields
-		in which case a new Go object is constructed first
-		"""
-		if len(kwargs) == 1 and 'handle' in kwargs:
-			self.handle = kwargs['handle']
-			_pycymbal.IncRef(self.handle)
-		elif len(args) == 1 and isinstance(args[0], go.GoClass):
-			self.handle = args[0].handle
-			_pycymbal.IncRef(self.handle)
-		else:
-			self.handle = _pycymbal.pycymbal_RefResult_CTor()
-			_pycymbal.IncRef(self.handle)
-			if  0 < len(args):
-				self.File = args[0]
-			if "File" in kwargs:
-				self.File = kwargs["File"]
-			if  1 < len(args):
-				self.Line = args[1]
-			if "Line" in kwargs:
-				self.Line = kwargs["Line"]
-			if  2 < len(args):
-				self.RelPath = args[2]
-			if "RelPath" in kwargs:
-				self.RelPath = kwargs["RelPath"]
-			if  3 < len(args):
-				self.Name = args[3]
-			if "Name" in kwargs:
-				self.Name = kwargs["Name"]
-	def __del__(self):
-		_pycymbal.DecRef(self.handle)
-	def __str__(self):
-		pr = [(p, getattr(self, p)) for p in dir(self) if not p.startswith('__')]
-		sv = 'pycymbal.RefResult{'
-		first = True
-		for v in pr:
-			if callable(v[1]):
-				continue
-			if first:
-				first = False
-			else:
-				sv += ', '
-			sv += v[0] + '=' + str(v[1])
-		return sv + '}'
-	def __repr__(self):
-		pr = [(p, getattr(self, p)) for p in dir(self) if not p.startswith('__')]
-		sv = 'pycymbal.RefResult ( '
-		for v in pr:
-			if not callable(v[1]):
-				sv += v[0] + '=' + str(v[1]) + ', '
-		return sv + ')'
-	@property
-	def File(self):
-		return _pycymbal.pycymbal_RefResult_File_Get(self.handle)
-	@File.setter
-	def File(self, value):
-		if isinstance(value, go.GoClass):
-			_pycymbal.pycymbal_RefResult_File_Set(self.handle, value.handle)
-		else:
-			_pycymbal.pycymbal_RefResult_File_Set(self.handle, value)
-	@property
-	def Line(self):
-		return _pycymbal.pycymbal_RefResult_Line_Get(self.handle)
-	@Line.setter
-	def Line(self, value):
-		if isinstance(value, go.GoClass):
-			_pycymbal.pycymbal_RefResult_Line_Set(self.handle, value.handle)
-		else:
-			_pycymbal.pycymbal_RefResult_Line_Set(self.handle, value)
-	@property
-	def RelPath(self):
-		return _pycymbal.pycymbal_RefResult_RelPath_Get(self.handle)
-	@RelPath.setter
-	def RelPath(self, value):
-		if isinstance(value, go.GoClass):
-			_pycymbal.pycymbal_RefResult_RelPath_Set(self.handle, value.handle)
-		else:
-			_pycymbal.pycymbal_RefResult_RelPath_Set(self.handle, value)
-	@property
-	def Name(self):
-		return _pycymbal.pycymbal_RefResult_Name_Get(self.handle)
-	@Name.setter
-	def Name(self, value):
-		if isinstance(value, go.GoClass):
-			_pycymbal.pycymbal_RefResult_Name_Set(self.handle, value.handle)
-		else:
-			_pycymbal.pycymbal_RefResult_Name_Set(self.handle, value)
-
-# Python type for struct pycymbal.SymbolResult
-class SymbolResult(go.GoClass):
-	"""SymbolResult represents a code symbol found during indexing\n"""
-	def __init__(self, *args, **kwargs):
-		"""
-		handle=A Go-side object is always initialized with an explicit handle=arg
-		otherwise parameters can be unnamed in order of field names or named fields
-		in which case a new Go object is constructed first
-		"""
-		if len(kwargs) == 1 and 'handle' in kwargs:
-			self.handle = kwargs['handle']
-			_pycymbal.IncRef(self.handle)
-		elif len(args) == 1 and isinstance(args[0], go.GoClass):
-			self.handle = args[0].handle
-			_pycymbal.IncRef(self.handle)
-		else:
-			self.handle = _pycymbal.pycymbal_SymbolResult_CTor()
-			_pycymbal.IncRef(self.handle)
-			if  0 < len(args):
-				self.Name = args[0]
-			if "Name" in kwargs:
-				self.Name = kwargs["Name"]
-			if  1 < len(args):
-				self.Kind = args[1]
-			if "Kind" in kwargs:
-				self.Kind = kwargs["Kind"]
-			if  2 < len(args):
-				self.File = args[2]
-			if "File" in kwargs:
-				self.File = kwargs["File"]
-			if  3 < len(args):
-				self.StartLine = args[3]
-			if "StartLine" in kwargs:
-				self.StartLine = kwargs["StartLine"]
-			if  4 < len(args):
-				self.EndLine = args[4]
-			if "EndLine" in kwargs:
-				self.EndLine = kwargs["EndLine"]
-			if  5 < len(args):
-				self.Language = args[5]
-			if "Language" in kwargs:
-				self.Language = kwargs["Language"]
-	def __del__(self):
-		_pycymbal.DecRef(self.handle)
-	def __str__(self):
-		pr = [(p, getattr(self, p)) for p in dir(self) if not p.startswith('__')]
-		sv = 'pycymbal.SymbolResult{'
-		first = True
-		for v in pr:
-			if callable(v[1]):
-				continue
-			if first:
-				first = False
-			else:
-				sv += ', '
-			sv += v[0] + '=' + str(v[1])
-		return sv + '}'
-	def __repr__(self):
-		pr = [(p, getattr(self, p)) for p in dir(self) if not p.startswith('__')]
-		sv = 'pycymbal.SymbolResult ( '
-		for v in pr:
-			if not callable(v[1]):
-				sv += v[0] + '=' + str(v[1]) + ', '
-		return sv + ')'
-	@property
-	def Name(self):
-		return _pycymbal.pycymbal_SymbolResult_Name_Get(self.handle)
-	@Name.setter
-	def Name(self, value):
-		if isinstance(value, go.GoClass):
-			_pycymbal.pycymbal_SymbolResult_Name_Set(self.handle, value.handle)
-		else:
-			_pycymbal.pycymbal_SymbolResult_Name_Set(self.handle, value)
-	@property
-	def Kind(self):
-		return _pycymbal.pycymbal_SymbolResult_Kind_Get(self.handle)
-	@Kind.setter
-	def Kind(self, value):
-		if isinstance(value, go.GoClass):
-			_pycymbal.pycymbal_SymbolResult_Kind_Set(self.handle, value.handle)
-		else:
-			_pycymbal.pycymbal_SymbolResult_Kind_Set(self.handle, value)
-	@property
-	def File(self):
-		return _pycymbal.pycymbal_SymbolResult_File_Get(self.handle)
-	@File.setter
-	def File(self, value):
-		if isinstance(value, go.GoClass):
-			_pycymbal.pycymbal_SymbolResult_File_Set(self.handle, value.handle)
-		else:
-			_pycymbal.pycymbal_SymbolResult_File_Set(self.handle, value)
-	@property
-	def StartLine(self):
-		return _pycymbal.pycymbal_SymbolResult_StartLine_Get(self.handle)
-	@StartLine.setter
-	def StartLine(self, value):
-		if isinstance(value, go.GoClass):
-			_pycymbal.pycymbal_SymbolResult_StartLine_Set(self.handle, value.handle)
-		else:
-			_pycymbal.pycymbal_SymbolResult_StartLine_Set(self.handle, value)
-	@property
-	def EndLine(self):
-		return _pycymbal.pycymbal_SymbolResult_EndLine_Get(self.handle)
-	@EndLine.setter
-	def EndLine(self, value):
-		if isinstance(value, go.GoClass):
-			_pycymbal.pycymbal_SymbolResult_EndLine_Set(self.handle, value.handle)
-		else:
-			_pycymbal.pycymbal_SymbolResult_EndLine_Set(self.handle, value)
-	@property
-	def Language(self):
-		return _pycymbal.pycymbal_SymbolResult_Language_Get(self.handle)
-	@Language.setter
-	def Language(self, value):
-		if isinstance(value, go.GoClass):
-			_pycymbal.pycymbal_SymbolResult_Language_Set(self.handle, value.handle)
-		else:
-			_pycymbal.pycymbal_SymbolResult_Language_Set(self.handle, value)
 
 
 # ---- Slices ---
