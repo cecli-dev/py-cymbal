@@ -105,14 +105,14 @@ dll_files = glob.glob("python/cymbal/pycymbal_go*")
 
 setup(
     name="py-cymbal",
-    version="0.1.10",
+    version="0.1.11",
     description="Python bindings for Cymbal code indexing and symbol discovery",
     author="Cymbal Contributors",
     author_email="contact@example.com",
     url="https://github.com/dwash/py-cymbal",
     packages=["cymbal"],
     package_dir={"": "python"},
-    package_data={"cymbal": ["*.so", "*.pyd", "*.dll", "*.dylib", "*.py"]},
+    package_data={"cymbal": ["*.so", "*.pyd", "*.dll", "*.dylib", "*.py", "_pycymbal*"]},
     ext_modules=[],
     zip_safe=False,
     install_requires=[],

@@ -52,21 +52,33 @@ def _load_binary():
     # Load the module
     spec = importlib.util.spec_from_file_location("cymbal._pycymbal", binary_path)
     mod = importlib.util.module_from_spec(spec)
+    # Inject into sys.modules and the current package's namespace
+    # to satisfy 'from . import _pycymbal' in generated submodules
     sys.modules["cymbal._pycymbal"] = mod
+    setattr(sys.modules[__name__], "_pycymbal", mod)
+    
+    # Also inject into 'cymbal' in case it's known by its absolute name
+    if "cymbal" in sys.modules:
+        setattr(sys.modules["cymbal"], "_pycymbal", mod)
+    
     spec.loader.exec_module(mod)
     return mod
 
-# Import go module for type hints
-
-# Load the binary and populate sys.modules before importing submodules
 try:
     _load_binary()
 except Exception:
-    # Allow import for documentation/etc even if binary is missing
     pass
 
-# Import go module for type hints
-from . import go
+# Move imports inside to avoid circular dependencies with generated submodules
+# which do 'from . import _pycymbal'
+def _get_go():
+    from . import go
+    return go
+
+def _get_pycymbal():
+    from . import pycymbal
+    return pycymbal
+
 class Cymbal:
     """Main interface to Cymbal functionality."""
     
@@ -79,7 +91,7 @@ class Cymbal:
         """
         cwd = os.getcwd()
         try:
-            from . import pycymbal
+            pycymbal = _get_pycymbal()
             self._cymbal = pycymbal.NewCymbal()
             if repo_path:
                 self.index(repo_path)
