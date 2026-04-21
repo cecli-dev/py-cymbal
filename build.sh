@@ -10,94 +10,82 @@ export PATH=$HOME/go/bin:$HOME/.local/bin:$(go env GOPATH 2>/dev/null)/bin:/usr/
 export CGO_CFLAGS="-DSQLITE_ENABLE_FTS5 $(python3 -c 'import sysconfig; print("-I" + sysconfig.get_path("include"))')"
 # Clean previous builds
 echo "Cleaning previous builds..."
-rm -rf python/cymbal/_pycymbal* python/cymbal/*.pyc __pycache__ build dist *.egg-info
+rm -rf python/cymbal/_pycymbal* python/cymbal/*.pyc __pycache__ build dist *.egg-info python/cymbal/bin
 
-# Build Go wrapper and generate Python bindings
-echo "Building Go wrapper and generating Python bindings..."
-# We will cd into go inside build_target or for gopy gen
+# Download pinned Cymbal binaries
+echo "Downloading pinned Cymbal v0.11.6 binaries..."
+mkdir -p python/cymbal/bin
 
-# Clean generated files
-rm -f pycymbal.go pycymbal.py go.py __init__.py build.py Makefile pycymbal.c pycymbal_go.* _pycymbal.*
+VERSION="v0.11.6"
+BASE_URL="https://github.com/1broseidon/cymbal/releases/download/$VERSION"
 
-# Generate Python bindings with gopy
-echo "Generating Python bindings with gopy..."
-cd go
-gopy gen -vm=python3 ./pycymbal
-cd ..
+# We use tar/unzip to extract the 'cymbal' binary and rename it
+
+# Linux x86_64
+curl -sL "$BASE_URL/cymbal_${VERSION}_linux_x86_64.tar.gz" | tar xz -C python/cymbal/bin cymbal
+mv python/cymbal/bin/cymbal python/cymbal/bin/cymbal-linux
+chmod +x python/cymbal/bin/cymbal-linux
+
+# Windows x86_64
+curl -sL "$BASE_URL/cymbal_${VERSION}_windows_x86_64.zip" -o /tmp/cymbal_win.zip
+unzip -p /tmp/cymbal_win.zip cymbal.exe > python/cymbal/bin/cymbal-windows.exe
+rm /tmp/cymbal_win.zip
+
+# macOS (Intel)
+curl -sL "$BASE_URL/cymbal_${VERSION}_darwin_x86_64.tar.gz" | tar xz -C python/cymbal/bin cymbal
+mv python/cymbal/bin/cymbal python/cymbal/bin/cymbal-darwin
+chmod +x python/cymbal/bin/cymbal-darwin
+
+echo "Binaries downloaded successfully."
+
+# Skip gopy/CGO build steps
+echo "Skipping CGO build steps, using subprocess architecture..."
+
+# Create dummy files if needed for backward compatibility during transition
+touch python/cymbal/go.py python/cymbal/pycymbal.py
 
 OS_NAME=$(uname -s)
-# Inject rpath fix into the generated Makefile (Linux/macOS only)
-if [[ "$OS_NAME" == "Darwin" ]]; then
-    sed -i '' "s|pycymbal_go\$(LIBEXT) -o _pycymbal\$(LIBEXT) |pycymbal_go\$(LIBEXT) -o _pycymbal\$(LIBEXT) -Wl,-rpath,'\$\$ORIGIN' |" go/Makefile
-elif [[ "$OS_NAME" == "Linux" ]]; then
-    sed -i "s|pycymbal_go\$(LIBEXT) -o _pycymbal\$(LIBEXT) |pycymbal_go\$(LIBEXT) -o _pycymbal\$(LIBEXT) -Wl,-rpath,'\$\$ORIGIN' |" go/Makefile
-fi
-# Build
-echo "Building for host platform..."
-cd go
 
-# Use standard LIBEXT for the current platform
-if [[ "$OS_NAME" == "Linux" ]]; then
-    make build LIBEXT=.so
-    [ -f _pycymbal.so ] && mv _pycymbal.so ../python/cymbal/_pycymbal.linux.so
-    [ -f pycymbal_go.so ] && mv pycymbal_go.so ../python/cymbal/pycymbal_go.linux.so
-elif [[ "$OS_NAME" == *"MINGW"* ]] || [[ "$OS_NAME" == *"MSYS"* ]] || [[ "$OS_NAME" == *"CYGWIN"* ]] || [[ "$OS_NAME" == "Windows_NT" ]]; then
-    echo "Building for Windows (manual)..."
-    # Manual build for Windows to avoid Makefile 'missing separator' issues
-    goimports -w pycymbal.go
-    # Fix 'two or more data types in declaration specifiers' error for bool on Windows
-    sed -i 's/typedef uint8_t bool;/\/\/ typedef uint8_t bool;/' pycymbal.go
-    # Use static linking for CGO components in the Go DLL
-    export CGO_LDFLAGS="-static-libgcc -static-libstdc++ -Wl,-Bstatic -lwinpthread -Wl,-Bdynamic"
-    go build -buildmode=c-shared -o pycymbal_go.dll pycymbal.go
-    python3 build.py
-    
-    # Get Python include and lib paths
-    PY_INC=$(python3 -c "import sysconfig; print(sysconfig.get_path('include'))")
-    PY_LIB=$(python3 -c "import sysconfig; import os; print(os.path.join(sysconfig.get_config_var('installed_base'), 'libs'))")
-    PY_VER=$(python3 -c "import sys; print(f'{sys.version_info.major}{sys.version_info.minor}')")
-    
-    # Compile the C extension
-    # Compile the C extension with static linking for MinGW runtimes to avoid DLL dependency issues
-    gcc pycymbal.c pycymbal_go.dll -o _pycymbal.pyd -I"$PY_INC" -L"$PY_LIB" -lpython$PY_VER -shared -w -static-libgcc -static-libstdc++ -Wl,-Bstatic -lwinpthread -Wl,-Bdynamic
-    
-    [ -f _pycymbal.pyd ] && mv _pycymbal.pyd ../python/cymbal/_pycymbal.windows.pyd
-    [ -f pycymbal_go.dll ] && mv pycymbal_go.dll ../python/cymbal/pycymbal_go.windows.dll
-elif [[ "$OS_NAME" == "Darwin" ]]; then
-    make build LIBEXT=.dylib
-    ls -la
-    [ -f _pycymbal.so ] && mv _pycymbal.so ../python/cymbal/_pycymbal.darwin.dylib
-    [ -f _pycymbal.dylib ] && mv _pycymbal.dylib ../python/cymbal/_pycymbal.darwin.dylib
-    [ -f pycymbal_go.dylib ] && mv pycymbal_go.dylib ../python/cymbal/pycymbal_go.darwin.dylib
-else
-    make build
-fi
-mkdir -p ../python/cymbal
-mv pycymbal.py go.py ../python/cymbal/
-cd ..
-rm -f python/cymbal/pycymbal.c
-
-# Move files to python directory
-echo "Organizing Python module..."
-cd ..
-# Files are already moved by build_target or the mv commands above
-# Do NOT copy pycymbal.c to python/cymbal/ to avoid setuptools auto-detection failure
-rm -f python/cymbal/pycymbal.c
-
-# Fix rpath for Linux and macOS binaries if they exist
-if [ -f python/cymbal/_pycymbal.linux.so ]; then
-    if command -v patchelf >/dev/null 2>&1; then
-        echo "Patching rpath for Linux..."
-        patchelf --set-rpath '$ORIGIN' python/cymbal/_pycymbal.linux.so
-    fi
-fi
-if [ -f python/cymbal/_pycymbal.darwin.dylib ]; then
-    echo "Patching rpath for macOS..."
-    install_name_tool -change pycymbal_go.dylib @loader_path/pycymbal_go.darwin.dylib python/cymbal/_pycymbal.darwin.dylib
-fi
 # Create MANIFEST.in to ensure binary files are included in the wheel
 echo "Creating MANIFEST.in..."
 cat > MANIFEST.in << 'MANIFESTEOF'
+include python/cymbal/bin/*
+include python/cymbal/*.py
+MANIFESTEOF
+
+# Create setup.py for pip installation
+echo "Creating setup.py..."
+cat > setup.py << 'SETUPEOF'
+from setuptools import setup
+import os
+
+setup(
+    name="py-cymbal",
+    version="0.1.17",
+    description="Python bindings for Cymbal code indexing and symbol discovery",
+    author="Cymbal Contributors",
+    author_email="contact@example.com",
+    url="https://github.com/dwash/py-cymbal",
+    packages=["cymbal"],
+    package_dir={"": "python"},
+    package_data={"cymbal": ["bin/*", "*.py"]},
+    zip_safe=False,
+    install_requires=[],
+    python_requires=">=3.7",
+    classifiers=[
+        "Development Status :: 3 - Alpha",
+        "Intended Audience :: Developers",
+        "License :: OSI Approved :: MIT License",
+        "Programming Language :: Python :: 3",
+        "Operating System :: POSIX :: Linux",
+        "Operating System :: MacOS :: MacOS X",
+        "Operating System :: Microsoft :: Windows",
+    ],
+)
+SETUPEOF
+
+echo "Build complete!"
+exit 0
 include python/cymbal/*.so
 include python/cymbal/*.pyd
 include python/cymbal/*.dll
@@ -118,7 +106,7 @@ dll_files = glob.glob("python/cymbal/pycymbal_go*")
 
 setup(
     name="py-cymbal",
-    version="0.1.16",
+    version="0.1.17",
     description="Python bindings for Cymbal code indexing and symbol discovery",
     author="Cymbal Contributors",
     author_email="contact@example.com",

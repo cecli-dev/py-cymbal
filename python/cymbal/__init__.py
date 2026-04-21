@@ -7,120 +7,33 @@ programmatic access to code symbol analysis, search, and reference finding.
 import os
 import sys
 import platform
-import ctypes
-import importlib.util
+import subprocess
+import json
 import shutil
 
-# Platform-specific binary loading
-def _load_binary():
-    import importlib.util
-    import platform
-    
-    pkg_dir = os.path.dirname(os.path.abspath(__file__))
-    system = platform.system().lower()
-    # Map platform to expected binary extensions
-    ext_map = {
-        "linux": ".linux.so",
-        "windows": ".windows.pyd",
-        "darwin": ".darwin.dylib"
-    }
-
-    # Map platform to our specific Go shared library names
-    lib_map = {
-        "linux": (".linux.so", "pycymbal_go.so"),
-        "windows": (".windows.dll", "pycymbal_go.dll"),
-        "darwin": (".darwin.dylib", "pycymbal_go.dylib")
-    }
-
-    # Ensure the Go shared library is available under its standard name
-    if system in lib_map:
-        suff, target_name = lib_map[system]
-        src_lib = os.path.join(pkg_dir, f"pycymbal_go{suff}")
-        dst_lib = os.path.join(pkg_dir, target_name)
-        
-        if os.path.exists(src_lib) and not os.path.exists(dst_lib):
-            try:
-                if hasattr(os, "symlink") and system != "windows":
-                    os.symlink(src_lib, dst_lib)
-                else:
-                    import shutil
-                    shutil.copy2(src_lib, dst_lib)
-            except Exception as e:
-                print(f"Warning: Could not create link from {src_lib} to {dst_lib}: {e}", file=sys.stderr)
-
-    # Setup DLL search path for Windows
-    if system == "windows":
-        if hasattr(os, "add_dll_directory"):
-            try:
-                os.add_dll_directory(pkg_dir)
-            except Exception:
-                pass
-        os.environ['PATH'] = pkg_dir + os.path.pathsep + os.environ.get('PATH', '')
-
-    # Determine binary path
-    suffix = ext_map.get(system)
-    if not suffix:
-        raise ImportError(f"Unsupported platform: {system}")
-        
-    binary_path = os.path.join(pkg_dir, f"_pycymbal{suffix}")
-    if not os.path.exists(binary_path):
-        for fallback in [".so", ".pyd", ".dylib"]:
-            p = os.path.join(pkg_dir, f"_pycymbal{fallback}")
-            if os.path.exists(p):
-                binary_path = p
-                break
-        else:
-            others = []
-            for plat, suff in ext_map.items():
-                if os.path.exists(os.path.join(pkg_dir, f"_pycymbal{suff}")):
-                    others.append(plat)
-            error_msg = f"Could not find _pycymbal binary for {system} at {pkg_dir}."
-            if others:
-                error_msg += f" Found binaries for: {', '.join(others)}."
-            raise ImportError(error_msg)
-
-    spec = importlib.util.spec_from_file_location("cymbal._pycymbal", binary_path)
-    mod = importlib.util.module_from_spec(spec)
-    # Inject into sys.modules and the current package's namespace
-    # to satisfy 'from . import _pycymbal' in generated submodules
-    sys.modules["cymbal._pycymbal"] = mod
-    setattr(sys.modules[__name__], "_pycymbal", mod)
-    
-    # Also inject into 'cymbal' in case it's known by its absolute name
-    if "cymbal" in sys.modules:
-        setattr(sys.modules["cymbal"], "_pycymbal", mod)
-    
-    spec.loader.exec_module(mod)
-    return mod
-
-try:
-    _load_binary()
-except Exception as e:
-    # Diagnostic for Windows loading failures
-    if sys.platform == "win32" and isinstance(e, ImportError):
-        pkg_dir = os.path.abspath(os.path.dirname(__file__))
-        go_dll = os.path.join(pkg_dir, "pycymbal_go.dll")
-        if os.path.exists(go_dll):
-            try:
-                ctypes.WinDLL(go_dll)
-            except Exception as dll_e:
-                print(f"Error: pycymbal_go.dll is present but cannot be loaded: {dll_e}", file=sys.stderr)
-                print("This usually indicates missing runtime dependencies (e.g. MinGW/VC++ redistributables).", file=sys.stderr)
-    
-    # Print original error but don't swallow it completely if it's an ImportError
-    if isinstance(e, ImportError):
-        print(f"Error loading cymbal binary: {e}", file=sys.stderr)
+class CymbalError(Exception):
+    """Exception raised for errors in the Cymbal CLI execution."""
     pass
 
-# Move imports inside to avoid circular dependencies with generated submodules
-# which do 'from . import _pycymbal'
-def _get_go():
-    from . import go
-    return go
-
-def _get_pycymbal():
-    from . import pycymbal
-    return pycymbal
+def _get_cymbal_binary():
+    """Locate the platform-specific Cymbal binary."""
+    pkg_dir = os.path.dirname(os.path.abspath(__file__))
+    system = platform.system().lower()
+    
+    bin_name = "cymbal"
+    if system == "linux":
+        bin_name = "cymbal-linux"
+    elif system == "windows":
+        bin_name = "cymbal-windows.exe"
+    elif system == "darwin":
+        bin_name = "cymbal-darwin"
+        
+    bin_path = os.path.join(pkg_dir, "bin", bin_name)
+    
+    if not os.path.exists(bin_path):
+        raise FileNotFoundError(f"Cymbal binary not found at {bin_path}. Ensure it is installed correctly.")
+        
+    return bin_path
 
 class Cymbal:
     """Main interface to Cymbal functionality."""
@@ -132,49 +45,32 @@ class Cymbal:
         Args:
             repo_path (str, optional): Path to repository to index immediately.
         """
-        cwd = os.getcwd()
+        self._bin_path = _get_cymbal_binary()
+        self._db_path = None
+        
+        if repo_path:
+            self.index(repo_path)
+            
+    def _run_cli(self, args, parse_json=True):
+        """Run the Cymbal CLI and optionally parse JSON output."""
+        cmd = [self._bin_path] + args
+        if parse_json and "--json" not in cmd:
+            cmd.append("--json")
+            
+        if self._db_path:
+            cmd.extend(["--db", self._db_path])
+            
         try:
-            pycymbal = _get_pycymbal()
-            self._cymbal = pycymbal.NewCymbal()
-            if repo_path:
-                self.index(repo_path)
-        finally:
-            os.chdir(cwd)
-    
-    def _symbol_to_dict(self, symbol):
-        """Convert a SymbolResult to a dictionary."""
-        if not symbol:
-            return None
-        return {
-            "name": symbol.Name,
-            "kind": symbol.Kind,
-            "file": symbol.File,
-            "start_line": symbol.StartLine,
-            "end_line": symbol.EndLine,
-            "language": symbol.Language
-        }
-
-    def _ref_to_dict(self, ref):
-        """Convert a RefResult to a dictionary."""
-        if not ref:
-            return None
-        return {
-            "file": ref.File,
-            "line": ref.Line,
-            "rel_path": ref.RelPath,
-            "name": ref.Name
-        }
-
-    def _impact_to_dict(self, impact):
-        """Convert an ImpactResult to a dictionary."""
-        if not impact:
-            return None
-        return {
-            "symbol": self._symbol_to_dict(impact.Symbol),
-            "reason": impact.Reason,
-            "severity": impact.Severity
-        }
-
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            if parse_json:
+                try:
+                    return json.loads(result.stdout)
+                except json.JSONDecodeError:
+                    raise CymbalError(f"Failed to parse JSON output from Cymbal: {result.stdout}")
+            return result.stdout
+        except subprocess.CalledProcessError as e:
+            raise CymbalError(f"Cymbal command failed (exit code {e.returncode}):\nStdout: {e.stdout}\nStderr: {e.stderr}")
+            
     def index(self, repo_path):
         """
         Index a repository.
@@ -183,30 +79,32 @@ class Cymbal:
             repo_path (str): Path to repository to index.
             
         Returns:
-            str: Statistics about the indexing operation.
+            str: Output from the indexing operation.
             
         Raises:
-            Exception: If indexing fails.
+            CymbalError: If indexing fails.
         """
-        return str(self._cymbal.Index(repo_path))
-    
+        # The index command might not output JSON cleanly, so we parse manually or just return text
+        cmd = ["index", repo_path]
+        return self._run_cli(cmd, parse_json=False)
+        
     def search(self, query, limit=20):
         """
         Search for symbols matching the query.
         
         Args:
             query (str): Search query text.
-            limit (int): Maximum number of results to return.
+            limit (int): Maximum number of results to return (ignored in CLI for now unless mapped).
             
         Returns:
             list: List of symbol results (as dictionaries).
             
         Raises:
-            Exception: If search fails or no database is available.
+            CymbalError: If search fails.
         """
-        results = self._cymbal.Search(query, limit)
-        return [self._symbol_to_dict(s) for s in results]
-    
+        res = self._run_cli(["search", query])
+        return res.get("results", [])
+        
     def investigate(self, symbol_name, file_hint=""):
         """
         Investigate a specific symbol.
@@ -219,22 +117,16 @@ class Cymbal:
             dict: Investigation result with definition and references.
             
         Raises:
-            Exception: If investigation fails or no database is available.
+            CymbalError: If investigation fails.
         """
-        res = self._cymbal.Investigate(symbol_name, file_hint)
-        if not res:
-            return None
+        # Form the query
+        query = symbol_name
+        if file_hint:
+            query = f"{file_hint}:{symbol_name}"
             
-        return {
-            "symbol": self._symbol_to_dict(res.Symbol),
-            "source": res.Source,
-            "kind": res.Kind,
-            "refs": [self._ref_to_dict(r) for r in res.Refs],
-            "impact": [self._impact_to_dict(i) for i in res.Impact],
-            "members": [self._symbol_to_dict(m) for m in res.Members],
-            "outline": [self._symbol_to_dict(o) for o in res.Outline]
-        }
-    
+        res = self._run_cli(["investigate", query])
+        return res
+        
     def find_references(self, symbol_name, limit=50):
         """
         Find references to a symbol.
@@ -247,30 +139,29 @@ class Cymbal:
             list: List of reference results (as dictionaries).
             
         Raises:
-            Exception: If reference finding fails or no database is available.
+            CymbalError: If reference finding fails.
         """
-        refs = self._cymbal.FindReferences(symbol_name, limit)
-        return [self._ref_to_dict(r) for r in refs]
-    
+        res = self._run_cli(["refs", symbol_name])
+        return res.get("references", [])
+        
     @property
     def db_path(self):
         """Get current database path."""
-        return str(self._cymbal.GetDBPath())
-    
+        return self._db_path
+        
     @db_path.setter
     def db_path(self, path):
         """Set database path directly."""
-        self._cymbal.SetDBPath(path)
-    
+        self._db_path = path
+        
     def close(self):
-        """Close Cymbal instance and release resources."""
-        # Note: The Go wrapper doesn't have a Close method yet
+        """Close Cymbal instance and release resources (No-op in subprocess mode)."""
         pass
-    
+        
     def __enter__(self):
         """Context manager entry."""
         return self
-    
+        
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Context manager exit."""
         self.close()

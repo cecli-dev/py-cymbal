@@ -39,30 +39,17 @@ jobs:
           echo "C:\msys64\mingw64\bin" >> $GITHUB_PATH
         fi
 
-    - name: Build Python bindings
+    - name: Build
       shell: bash
       run: |
-        export CGO_CFLAGS="-DSQLITE_ENABLE_FTS5"
         ./build.sh
 
     - name: Rename and Upload binaries
       shell: bash
       run: |
         mkdir -p binary-artifacts
-        if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
-          cp python/cymbal/_pycymbal.linux.so binary-artifacts/ || cp python/cymbal/_pycymbal.so binary-artifacts/_pycymbal.linux.so
-          cp python/cymbal/pycymbal_go.linux.so binary-artifacts/ || cp python/cymbal/pycymbal_go.so binary-artifacts/pycymbal_go.linux.so
-        elif [ "${{ matrix.os }}" = "windows-latest" ]; then
-          cp python/cymbal/_pycymbal.windows.pyd binary-artifacts/ || cp python/cymbal/_pycymbal.pyd binary-artifacts/_pycymbal.windows.pyd
-          cp python/cymbal/pycymbal_go.windows.dll binary-artifacts/ || cp python/cymbal/pycymbal_go.dll binary-artifacts/pycymbal_go.windows.dll
-        elif [ "${{ matrix.os }}" = "macos-latest" ]; then
-          cp python/cymbal/_pycymbal.darwin.dylib binary-artifacts/ || cp python/cymbal/_pycymbal.dylib binary-artifacts/_pycymbal.darwin.dylib
-          cp python/cymbal/pycymbal_go.darwin.dylib binary-artifacts/ || cp python/cymbal/pycymbal_go.dylib binary-artifacts/pycymbal_go.darwin.dylib
-        fi
-        cp python/cymbal/pycymbal.py binary-artifacts/
-        cp python/cymbal/go.py binary-artifacts/
+        cp -r python/cymbal/bin binary-artifacts/
         cp setup.py binary-artifacts/
-
     - name: Upload binaries
       uses: actions/upload-artifact@v4
       with:
@@ -90,9 +77,9 @@ jobs:
 
     - name: Organize package
       run: |
-        mkdir -p python/cymbal
-        cp binaries/* python/cymbal/
-        [ -f python/cymbal/setup.py ] && mv python/cymbal/setup.py . || echo "setup.py not found in binaries, using repo version"
+        mkdir -p python/cymbal/bin
+        cp -r binaries/bin/* python/cymbal/bin/
+        [ -f binaries/setup.py ] && mv binaries/setup.py . || echo "setup.py not found in binaries, using repo version"
 
     - name: Build universal wheel
       run: |
