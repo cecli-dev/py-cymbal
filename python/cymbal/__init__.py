@@ -129,9 +129,12 @@ class CymbalSubprocess:
     
     def investigate(self, symbol_name: str, file_hint: str = "") -> Dict[str, Any]:
         """Investigate a symbol."""
-        args = ["investigate", symbol_name]
+
         if file_hint:
-            args.extend(["--file", file_hint])
+            symbol_name = f"{file_hint}:{symbol_name}"
+
+        args = ["investigate", symbol_name]
+
         return self._run_command(args)
     
     def find_references(self, symbol_name: str, limit: int = 50) -> List[Dict[str, Any]]:

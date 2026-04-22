@@ -4,7 +4,7 @@ set -e
 # Build cross-platform wheels for py-cymbal by downloading pre-compiled binaries
 # and packaging them into appropriate platform-specific wheels.
 
-VERSION="0.1.23"
+VERSION="0.1.24"
 CYMBAL_VERSION="0.11.6"
 BASE_URL="https://github.com/1broseidon/cymbal/releases/download/v${CYMBAL_VERSION}"
 
