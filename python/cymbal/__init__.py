@@ -11,29 +11,140 @@ import subprocess
 import json
 import shutil
 
-class CymbalError(Exception):
-    """Exception raised for errors in the Cymbal CLI execution."""
-    pass
+from typing import Optional, List, Dict, Any
+from pathlib import Path
 
-def _get_cymbal_binary():
-    """Locate the platform-specific Cymbal binary."""
-    pkg_dir = os.path.dirname(os.path.abspath(__file__))
-    system = platform.system().lower()
+# Platform-specific binary names
+PLATFORM_BINARIES = {
+    "linux": "cymbal-linux",
+    "windows": "cymbal-windows.exe", 
+    "darwin": "cymbal-darwin"
+}
+
+class CymbalSubprocess:
+    """Subprocess-based interface to Cymbal binary."""
     
-    bin_name = "cymbal"
-    if system == "linux":
-        bin_name = "cymbal-linux"
-    elif system == "windows":
-        bin_name = "cymbal-windows.exe"
-    elif system == "darwin":
-        bin_name = "cymbal-darwin"
+    def __init__(self, binary_path: Optional[str] = None):
+        """
+        Initialize Cymbal subprocess interface.
         
-    bin_path = os.path.join(pkg_dir, "bin", bin_name)
+        Args:
+            binary_path: Optional path to Cymbal binary. If not provided,
+                        will look in package's bin directory.
+        """
+        self.binary_path = binary_path or self._find_binary()
+        self.temp_dir = None
+        self.db_path = None
+        
+    def _find_binary(self) -> str:
+        """Find the Cymbal binary for the current platform."""
+        pkg_dir = Path(__file__).parent
+        bin_dir = pkg_dir / "bin"
+        system = platform.system().lower()
+        
+        # Map system to binary name
+        binary_name = PLATFORM_BINARIES.get(system)
+        if not binary_name:
+            raise RuntimeError(f"Unsupported platform: {system}")
+        
+        # Check in bin directory first
+        binary_path = bin_dir / binary_name
+        if binary_path.exists():
+            if system != "windows":
+                binary_path.chmod(0o755)
+            return str(binary_path)
+        
+        # Check if binary exists without bin directory (legacy location)
+        binary_path = pkg_dir / binary_name
+        if binary_path.exists():
+            if system != "windows":
+                binary_path.chmod(0o755)
+            return str(binary_path)
+        
+        raise RuntimeError(
+            f"Cymbal binary not found for {system}. "
+            f"Expected at: {bin_dir / binary_name} or {pkg_dir / binary_name}"
+        )
     
-    if not os.path.exists(bin_path):
-        raise FileNotFoundError(f"Cymbal binary not found at {bin_path}. Ensure it is installed correctly.")
+    def _run_command(self, args: List[str], input_data: Optional[str] = None) -> Dict[str, Any]:
+        """Run Cymbal command and parse JSON output."""
+        cmd = [self.binary_path] + args
         
-    return bin_path
+        # Add db_path if set
+        if self.db_path:
+            cmd.extend(["--db", self.db_path])
+            
+        if "--json" not in cmd:
+            cmd.append("--json")
+        
+        try:
+            result = subprocess.run(
+                cmd,
+                input=input_data,
+                capture_output=True,
+                text=True,
+                encoding='utf-8'
+            )
+            
+            if result.returncode != 0:
+                raise RuntimeError(
+                    f"Cymbal command failed: {result.stderr}"
+                )
+            
+            # Parse JSON output
+            try:
+                # Sometime cymbal outputs extra plain text, try to extract json from the output.
+                output_str = result.stdout.strip()
+                if not output_str.startswith("{") and not output_str.startswith("["):
+                    # try to find the start of json
+                    json_start = output_str.find("{")
+                    array_start = output_str.find("[")
+                    if json_start != -1 and (array_start == -1 or json_start < array_start):
+                         output_str = output_str[json_start:]
+                    elif array_start != -1:
+                        output_str = output_str[array_start:]
+                
+                if not output_str:
+                    return {}
+                    
+                return json.loads(output_str)
+            except json.JSONDecodeError as e:
+                # If it's still not valid JSON, but the command succeeded, maybe it doesn't output JSON for this action.
+                if result.returncode == 0:
+                    return {"result": result.stdout}
+                raise RuntimeError(f"Failed to parse Cymbal output: {e}. Output: {result.stdout}")
+        except Exception as e:
+            raise RuntimeError(f"Failed to execute Cymbal: {e}")
+    
+    def index(self, repo_path: str) -> Dict[str, Any]:
+        """Index a repository."""
+        return self._run_command(["index", repo_path])
+    
+    def search(self, query: str, limit: int = 20) -> List[Dict[str, Any]]:
+        """Search for symbols."""
+        return self._run_command(["search", query, "--limit", str(limit)])
+    
+    def investigate(self, symbol_name: str, file_hint: str = "") -> Dict[str, Any]:
+        """Investigate a symbol."""
+        args = ["investigate", symbol_name]
+        if file_hint:
+            args.extend(["--file", file_hint])
+        return self._run_command(args)
+    
+    def find_references(self, symbol_name: str, limit: int = 50) -> List[Dict[str, Any]]:
+        """Find references to a symbol."""
+        return self._run_command(["refs", symbol_name, "--limit", str(limit)])
+    
+    def close(self):
+        """Clean up resources."""
+        if self.temp_dir and os.path.exists(self.temp_dir):
+            shutil.rmtree(self.temp_dir, ignore_errors=True)
+    
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
 
 class Cymbal:
     """Main interface to Cymbal functionality."""
@@ -45,125 +156,39 @@ class Cymbal:
         Args:
             repo_path (str, optional): Path to repository to index immediately.
         """
-        self._bin_path = _get_cymbal_binary()
-        self._db_path = None
-        
+        self._cymbal = CymbalSubprocess()
         if repo_path:
             self.index(repo_path)
-            
-    def _run_cli(self, args, parse_json=True):
-        """Run the Cymbal CLI and optionally parse JSON output."""
-        cmd = [self._bin_path] + args
-        if parse_json and "--json" not in cmd:
-            cmd.append("--json")
-            
-        if self._db_path:
-            cmd.extend(["--db", self._db_path])
-            
-        try:
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-            if parse_json:
-                try:
-                    return json.loads(result.stdout)
-                except json.JSONDecodeError:
-                    raise CymbalError(f"Failed to parse JSON output from Cymbal: {result.stdout}")
-            return result.stdout
-        except subprocess.CalledProcessError as e:
-            raise CymbalError(f"Cymbal command failed (exit code {e.returncode}):\nStdout: {e.stdout}\nStderr: {e.stderr}")
-            
-    def index(self, repo_path):
-        """
-        Index a repository.
-        
-        Args:
-            repo_path (str): Path to repository to index.
-            
-        Returns:
-            str: Output from the indexing operation.
-            
-        Raises:
-            CymbalError: If indexing fails.
-        """
-        # The index command might not output JSON cleanly, so we parse manually or just return text
-        cmd = ["index", repo_path]
-        return self._run_cli(cmd, parse_json=False)
-        
-    def search(self, query, limit=20):
-        """
-        Search for symbols matching the query.
-        
-        Args:
-            query (str): Search query text.
-            limit (int): Maximum number of results to return (ignored in CLI for now unless mapped).
-            
-        Returns:
-            list: List of symbol results (as dictionaries).
-            
-        Raises:
-            CymbalError: If search fails.
-        """
-        res = self._run_cli(["search", query])
-        return res.get("results", [])
-        
-    def investigate(self, symbol_name, file_hint=""):
-        """
-        Investigate a specific symbol.
-        
-        Args:
-            symbol_name (str): Name of symbol to investigate.
-            file_hint (str, optional): Filter matches to symbols in this file path.
-            
-        Returns:
-            dict: Investigation result with definition and references.
-            
-        Raises:
-            CymbalError: If investigation fails.
-        """
-        # Form the query
-        query = symbol_name
-        if file_hint:
-            query = f"{file_hint}:{symbol_name}"
-            
-        res = self._run_cli(["investigate", query])
-        return res
-        
-    def find_references(self, symbol_name, limit=50):
-        """
-        Find references to a symbol.
-        
-        Args:
-            symbol_name (str): Name of symbol to find references for.
-            limit (int): Maximum number of references to return.
-            
-        Returns:
-            list: List of reference results (as dictionaries).
-            
-        Raises:
-            CymbalError: If reference finding fails.
-        """
-        res = self._run_cli(["refs", symbol_name])
-        return res.get("references", [])
-        
+    
     @property
     def db_path(self):
-        """Get current database path."""
-        return self._db_path
+        return self._cymbal.db_path
         
     @db_path.setter
     def db_path(self, path):
-        """Set database path directly."""
-        self._db_path = path
+        self._cymbal.db_path = path
+
+    def index(self, repo_path):
+        return self._cymbal.index(repo_path)
         
+    def search(self, query, limit=20):
+        res = self._cymbal.search(query, limit)
+        return res.get("results", [])
+        
+    def investigate(self, symbol_name, file_hint=""):
+        res = self._cymbal.investigate(symbol_name, file_hint)
+        return res
+        
+    def find_references(self, symbol_name, limit=50):
+        res = self._cymbal.find_references(symbol_name, limit)
+        return res.get("results", [])
     def close(self):
-        """Close Cymbal instance and release resources (No-op in subprocess mode)."""
-        pass
+        self._cymbal.close()
         
     def __enter__(self):
-        """Context manager entry."""
         return self
         
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit."""
         self.close()
 
 # Convenience functions
@@ -191,6 +216,14 @@ def investigate_symbol(symbol_name, file_hint="", db_path=None):
         return c.investigate(symbol_name, file_hint)
     finally:
         c.close()
+def find_references(symbol_name, limit=50, db_path=None):
+    """Convenience function to find references to a symbol."""
+    c = Cymbal()
+    if db_path:
+        c.db_path = db_path
+    try:
+        return c.find_references(symbol_name, limit)
+    finally:
+        c.close()
 
 # Export main classes and functions
-__all__ = ['Cymbal', 'index_repository', 'search_symbols', 'investigate_symbol']

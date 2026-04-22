@@ -4,7 +4,7 @@ set -e
 # Build cross-platform wheels for py-cymbal by downloading pre-compiled binaries
 # and packaging them into appropriate platform-specific wheels.
 
-VERSION="0.1.21"
+VERSION="0.1.22"
 CYMBAL_VERSION="0.11.6"
 BASE_URL="https://github.com/1broseidon/cymbal/releases/download/v${CYMBAL_VERSION}"
 
@@ -93,7 +93,7 @@ for plat_info in "${PLATFORMS[@]}"; do
     
     # Build wheel
     export WHEEL_PLATFORM_NAME="$plat_tag"
-    if command -v python3 &>/dev/null; then
+    if command -v python3 >/dev/null 2>&1; then
         echo "Running python3 -m build"
         python3 -m pip install build wheel
         python3 -m build --wheel --no-isolation
@@ -103,11 +103,6 @@ for plat_info in "${PLATFORMS[@]}"; do
         python -m build --wheel --no-isolation
     fi
 done
-        python -m pip install build wheel
-        python -m build --wheel --no-isolation
-    fi
-done
-
 # Clean up
 rm setup.py
 rm -rf .tmp build
