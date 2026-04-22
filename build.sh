@@ -1,147 +1,91 @@
 #!/bin/bash
-# Build script for py-cymbal Python bindings
+set -e
 
-set -e  # Exit on error
+# Build cross-platform wheels for py-cymbal by downloading pre-compiled binaries
+# and packaging them into appropriate platform-specific wheels.
 
-echo "Building py-cymbal Python bindings..."
+VERSION="0.1.18"
+CYMBAL_VERSION="0.11.6"
+BASE_URL="https://github.com/1broseidon/cymbal/releases/download/v${CYMBAL_VERSION}"
 
-# Set up environment
-export PATH=$HOME/go/bin:$HOME/.local/bin:$(go env GOPATH 2>/dev/null)/bin:/usr/local/go/bin:$PATH
-export CGO_CFLAGS="-DSQLITE_ENABLE_FTS5 $(python3 -c 'import sysconfig; print("-I" + sysconfig.get_path("include"))')"
-# Clean previous builds
-echo "Cleaning previous builds..."
-rm -rf python/cymbal/_pycymbal* python/cymbal/*.pyc __pycache__ build dist *.egg-info python/cymbal/bin
+echo "Building py-cymbal v${VERSION} wheels using Cymbal v${CYMBAL_VERSION} binaries..."
 
-# Download pinned Cymbal binaries
-echo "Downloading pinned Cymbal v0.11.6 binaries..."
+# Ensure directories exist
+mkdir -p dist
 mkdir -p python/cymbal/bin
+mkdir -p .tmp
 
-VERSION="v0.11.6"
-BASE_URL="https://github.com/1broseidon/cymbal/releases/download/$VERSION"
+# Clean previous builds
+rm -rf build python/cymbal/bin/* .tmp/*
 
-# We use tar/unzip to extract the 'cymbal' binary and rename it
+# Map python platform tags to cymbal release assets and binary names
+# Format: "plat_tag:archive_name:bin_in_archive:dest_name"
+declare -a PLATFORMS=(
+    "manylinux_2_17_x86_64:cymbal_v${CYMBAL_VERSION}_linux_x86_64.tar.gz:cymbal:cymbal-linux"
+    "manylinux_2_17_aarch64:cymbal_v${CYMBAL_VERSION}_linux_arm64.tar.gz:cymbal:cymbal-linux"
+    "macosx_10_9_x86_64:cymbal_v${CYMBAL_VERSION}_darwin_x86_64.tar.gz:cymbal:cymbal-darwin"
+    "macosx_11_0_arm64:cymbal_v${CYMBAL_VERSION}_darwin_arm64.tar.gz:cymbal:cymbal-darwin"
+    "win_amd64:cymbal_v${CYMBAL_VERSION}_windows_x86_64.zip:cymbal.exe:cymbal-windows.exe"
+)
 
-# Linux x86_64
-curl -sL "$BASE_URL/cymbal_${VERSION}_linux_x86_64.tar.gz" | tar xz -C python/cymbal/bin cymbal
-mv python/cymbal/bin/cymbal python/cymbal/bin/cymbal-linux
-chmod +x python/cymbal/bin/cymbal-linux
-
-# Windows x86_64
-curl -sL "$BASE_URL/cymbal_${VERSION}_windows_x86_64.zip" -o /tmp/cymbal_win.zip
-unzip -p /tmp/cymbal_win.zip cymbal.exe > python/cymbal/bin/cymbal-windows.exe
-rm /tmp/cymbal_win.zip
-
-# macOS (Intel)
-curl -sL "$BASE_URL/cymbal_${VERSION}_darwin_x86_64.tar.gz" | tar xz -C python/cymbal/bin cymbal
-mv python/cymbal/bin/cymbal python/cymbal/bin/cymbal-darwin
-chmod +x python/cymbal/bin/cymbal-darwin
-
-echo "Binaries downloaded successfully."
-
-# Skip gopy/CGO build steps
-echo "Skipping CGO build steps, using subprocess architecture..."
-
-# Create dummy files if needed for backward compatibility during transition
-touch python/cymbal/go.py python/cymbal/pycymbal.py
-
-OS_NAME=$(uname -s)
-
-# Create MANIFEST.in to ensure binary files are included in the wheel
-echo "Creating MANIFEST.in..."
-cat > MANIFEST.in << 'MANIFESTEOF'
-include python/cymbal/bin/*
-include python/cymbal/*.py
-MANIFESTEOF
-
-# Create setup.py for pip installation
-echo "Creating setup.py..."
-cat > setup.py << 'SETUPEOF'
+# Temporary setup.py template for building platform-specific wheels
+cat << 'SETUPEOF' > setup.py
 from setuptools import setup
+from setuptools.dist import Distribution
 import os
 
+class BinaryDistribution(Distribution):
+    def has_ext_modules(foo):
+        return True
+
+plat_name = os.environ.get('WHEEL_PLATFORM_NAME', 'any')
+
 setup(
-    name="py-cymbal",
-    version="0.1.17",
-    description="Python bindings for Cymbal code indexing and symbol discovery",
-    author="Cymbal Contributors",
-    author_email="contact@example.com",
-    url="https://github.com/dwash/py-cymbal",
-    packages=["cymbal"],
-    package_dir={"": "python"},
-    package_data={"cymbal": ["bin/*", "*.py"]},
-    zip_safe=False,
-    install_requires=[],
-    python_requires=">=3.7",
-    classifiers=[
-        "Development Status :: 3 - Alpha",
-        "Intended Audience :: Developers",
-        "License :: OSI Approved :: MIT License",
-        "Programming Language :: Python :: 3",
-        "Operating System :: POSIX :: Linux",
-        "Operating System :: MacOS :: MacOS X",
-        "Operating System :: Microsoft :: Windows",
-    ],
+    distclass=BinaryDistribution,
+    options={'bdist_wheel': {'plat_name': plat_name}}
 )
 SETUPEOF
 
-echo "Build complete!"
-exit 0
-include python/cymbal/*.so
-include python/cymbal/*.pyd
-include python/cymbal/*.dll
-include python/cymbal/*.dylib
-include python/cymbal/_pycymbal*
-MANIFESTEOF
+for plat_info in "${PLATFORMS[@]}"; do
+    IFS=':' read -r plat_tag archive_name bin_in_archive dest_name <<< "$plat_info"
+    
+    echo -e "\n=== Building wheel for $plat_tag ==="
+    
+    # Clean bin dir
+    rm -rf python/cymbal/bin/*
+    
+    # Download archive if not exists
+    archive_path=".tmp/$archive_name"
+    if [ ! -f "$archive_path" ]; then
+        url="${BASE_URL}/${archive_name}"
+        echo "Downloading $url"
+        curl -sL -o "$archive_path" "$url"
+    fi
+    
+    # Extract binary
+    bin_path="python/cymbal/bin/$dest_name"
+    echo "Extracting $bin_in_archive to $bin_path"
+    
+    if [[ "$archive_name" == *.zip ]]; then
+        unzip -p "$archive_path" "$bin_in_archive" > "$bin_path"
+    else
+        tar -xzf "$archive_path" -O "$bin_in_archive" > "$bin_path"
+    fi
+    
+    # Make executable if not Windows
+    if [[ "$dest_name" != *.exe ]]; then
+        chmod +x "$bin_path"
+    fi
+    
+    # Build wheel
+    echo "Running python -m build"
+    export WHEEL_PLATFORM_NAME="$plat_tag"
+    python -m build --wheel --no-isolation
+done
 
-# Create setup.py for pip installation
-echo "Creating setup.py..."
-cat > setup.py << 'SETUPEOF'
-from setuptools import setup, Extension
-import os
+# Clean up
+rm setup.py
+rm -rf .tmp build
 
-# Check if we have the compiled extension
-import glob
-ext_files = glob.glob("python/cymbal/_pycymbal*")
-dll_files = glob.glob("python/cymbal/pycymbal_go*")
-
-setup(
-    name="py-cymbal",
-    version="0.1.17",
-    description="Python bindings for Cymbal code indexing and symbol discovery",
-    author="Cymbal Contributors",
-    author_email="contact@example.com",
-    url="https://github.com/dwash/py-cymbal",
-    packages=["cymbal"],
-    package_dir={"": "python"},
-    package_data={"cymbal": ["*.so", "*.pyd", "*.dll", "*.dylib", "*.py", "_pycymbal*"]},
-    ext_modules=[],
-    zip_safe=False,
-    install_requires=[],
-    python_requires=">=3.7",
-    license="MIT",
-    license_files=[],
-    include_package_data=True,
-    classifiers=[
-        "Development Status :: 3 - Alpha",
-        "Intended Audience :: Developers",
-        "License :: OSI Approved :: MIT License",
-        "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.7",
-        "Programming Language :: Python :: 3.8",
-        "Programming Language :: Python :: 3.9",
-        "Programming Language :: Python :: 3.10",
-        "Programming Language :: Python :: 3.11",
-        "Programming Language :: Python :: 3.12",
-        "Operating System :: POSIX :: Linux",
-        "Operating System :: MacOS :: MacOS X",
-    ],
-)
-SETUPEOF
-
-echo "Build complete!"
-echo ""
-echo "To install in development mode:"
-echo "  pip install -e ."
-echo ""
-echo "To test the installation:"
-echo "  python3 -c \"import cymbal; print('Cymbal Python bindings loaded successfully')\""
+echo -e "\n=== Build complete! Wheels are in dist/ ==="
+ls -lh dist/

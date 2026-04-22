@@ -1,26 +1,14 @@
 from setuptools import setup
+from setuptools.dist import Distribution
 import os
 
+class BinaryDistribution(Distribution):
+    def has_ext_modules(foo):
+        return True
+
+plat_name = os.environ.get('WHEEL_PLATFORM_NAME', 'any')
+
 setup(
-    name="py-cymbal",
-    version="0.1.17",
-    description="Python bindings for Cymbal code indexing and symbol discovery",
-    author="Cymbal Contributors",
-    author_email="contact@example.com",
-    url="https://github.com/dwash/py-cymbal",
-    packages=["cymbal"],
-    package_dir={"": "python"},
-    package_data={"cymbal": ["bin/*", "*.py"]},
-    zip_safe=False,
-    install_requires=[],
-    python_requires=">=3.7",
-    classifiers=[
-        "Development Status :: 3 - Alpha",
-        "Intended Audience :: Developers",
-        "License :: OSI Approved :: MIT License",
-        "Programming Language :: Python :: 3",
-        "Operating System :: POSIX :: Linux",
-        "Operating System :: MacOS :: MacOS X",
-        "Operating System :: Microsoft :: Windows",
-    ],
+    distclass=BinaryDistribution,
+    options={'bdist_wheel': {'plat_name': plat_name}}
 )
