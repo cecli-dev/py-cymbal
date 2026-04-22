@@ -87,8 +87,11 @@ class CymbalSubprocess:
             )
             
             if result.returncode != 0:
+                error_output = result.stderr + result.stdout
+                if "no results found" in error_output.lower():
+                    return {}
                 raise RuntimeError(
-                    f"Cymbal command failed: {result.stderr}"
+                    f"Cymbal command failed: {result.stderr or result.stdout}"
                 )
             
             # Parse JSON output
@@ -173,7 +176,9 @@ class Cymbal:
         
     def search(self, query, limit=20):
         res = self._cymbal.search(query, limit)
-        return res.get("results", [])
+        if isinstance(res, dict):
+            return res.get("results", [])
+        return res if res else []
         
     def investigate(self, symbol_name, file_hint=""):
         res = self._cymbal.investigate(symbol_name, file_hint)
@@ -181,7 +186,9 @@ class Cymbal:
         
     def find_references(self, symbol_name, limit=50):
         res = self._cymbal.find_references(symbol_name, limit)
-        return res.get("results", [])
+        if isinstance(res, dict):
+            return res.get("results", [])
+        return res if res else []
     def close(self):
         self._cymbal.close()
         

@@ -4,7 +4,7 @@ set -e
 # Build cross-platform wheels for py-cymbal by downloading pre-compiled binaries
 # and packaging them into appropriate platform-specific wheels.
 
-VERSION="0.1.22"
+VERSION="0.1.23"
 CYMBAL_VERSION="0.11.6"
 BASE_URL="https://github.com/1broseidon/cymbal/releases/download/v${CYMBAL_VERSION}"
 
@@ -89,6 +89,11 @@ for plat_info in "${PLATFORMS[@]}"; do
     # Make executable if not Windows
     if [[ "$dest_name" != *.exe ]]; then
         chmod +x "$bin_path"
+        # Also copy to package root for local testing/editable installs
+        cp "$bin_path" "python/cymbal/$dest_name"
+    else
+        # Also copy to package root for local testing/editable installs
+        cp "$bin_path" "python/cymbal/$dest_name"
     fi
     
     # Build wheel
