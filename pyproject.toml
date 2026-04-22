@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "py-cymbal"
-version = "0.1.19"
+version = "0.1.20"
 description = "Python bindings for Cymbal code indexing and symbol discovery"
 readme = "README.md"
 requires-python = ">=3.7"
