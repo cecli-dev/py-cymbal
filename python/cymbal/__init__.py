@@ -124,22 +124,29 @@ class CymbalSubprocess:
         return self._run_command(["index", repo_path])
     
     def search(self, query: str, limit: int = 20) -> List[Dict[str, Any]]:
-        """Search for symbols."""
-        return self._run_command(["search", query, "--limit", str(limit)])
+        """Search for symbols.
+
+        Queries are quoted to prevent FTS5 interpretation of special characters
+        (e.g. hyphens treated as NOT operator causing SQL errors).
+        """
+        safe_query = f'"{query}"' if query and not query.startswith('"') else query
+        return self._run_command(["search", safe_query, "--limit", str(limit)])
     
     def investigate(self, symbol_name: str, file_hint: str = "") -> Dict[str, Any]:
         """Investigate a symbol."""
-
+        # Quote if contains special FTS5 characters
+        safe_name = f'"{symbol_name}"' if symbol_name and any(c in symbol_name for c in '-+*~') else symbol_name
         if file_hint:
-            symbol_name = f"{file_hint}:{symbol_name}"
+            safe_name = f"{file_hint}:{safe_name}"
 
-        args = ["investigate", symbol_name]
+        args = ["investigate", safe_name]
 
         return self._run_command(args)
     
     def find_references(self, symbol_name: str, limit: int = 50) -> List[Dict[str, Any]]:
         """Find references to a symbol."""
-        return self._run_command(["refs", symbol_name, "--limit", str(limit)])
+        safe_name = f'"{symbol_name}"' if symbol_name and any(c in symbol_name for c in '-+*~') else symbol_name
+        return self._run_command(["refs", safe_name, "--limit", str(limit)])
     
     def close(self):
         """Clean up resources."""
